@@ -1,0 +1,3 @@
+[submodule "lib/SD_ZH03B"]
+	path = lib/SD_ZH03B
+	url = git@github.com:ShaggyDog18/SD_ZH03B.git

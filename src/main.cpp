@@ -247,7 +247,8 @@ void loop()
     Serial.println("Woke up successfully");
 
   int sample[3];
-  if (sample_sensor(sample)) {
+  bool success = sample_sensor(sample);
+  if (success) {
     char printbuf[80];
     sprintf(printbuf, "Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]", sample[0], sample[1], sample[2]);
     Serial.println(printbuf);
@@ -258,10 +259,12 @@ void loop()
   if (ZH03B.sleep())
     Serial.println("Sleep mode confirmed");
 
-  if (post_measurement(sample)) {
-    Serial.println("successfully submitted sample");
-  } else {
-    Serial.println("failed to submit sample");
+  if (success) {
+    if (post_measurement(sample)) {
+      Serial.println("successfully submitted sample");
+    } else {
+      Serial.println("failed to submit sample");
+    }
   }
 
   delay(MEASUREMENT_DELAY);

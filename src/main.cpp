@@ -22,9 +22,10 @@ char influxdb_url[200] = "";
 
 bool configured = false;
 bool should_save_config = false;
-static int NUM_ATTEMPTS = 5;
-static int SAMPLE_DELAY = 5000;
-static int MEASUREMENT_DELAY = 60000;
+static int NUM_SAMPLES = 10;
+static int MIN_SAMPLES_FOR_SUCCESS = 4;
+static int SAMPLE_DELAY = 3000;
+static int MEASUREMENT_DELAY = 30000;
 static char* URL_TEMPLATE = "http://%s:%s/write?db=%s";
 static char* MEASUREMENT_TEMPLATE = "particulate_matter,node=%s p1_0=%d,p2_5=%d,p10_0=%d";
 
@@ -166,16 +167,29 @@ bool read_sensor_data(uint16_t* arr) {
   } 
 }
 
+int sort_uint16_desc(const void *cmp1, const void *cmp2)
+{
+  uint16_t a = *((uint16_t *)cmp1);
+  uint16_t b = *((uint16_t *)cmp2);
+  return b - a;
+}
+
+uint16_t median_value(uint16_t* values, int count) {
+  qsort(values, count, sizeof(values[0]), sort_uint16_desc);
+
+  return values[(count / 2) - 1];
+}
+
 bool sample_sensor(int* arr) {
   Serial.println("attemping average sample");
-  uint16_t pm1_0[NUM_ATTEMPTS];
-  uint16_t pm2_5[NUM_ATTEMPTS];
-  uint16_t pm10_0[NUM_ATTEMPTS];
+  uint16_t pm1_0[NUM_SAMPLES];
+  uint16_t pm2_5[NUM_SAMPLES];
+  uint16_t pm10_0[NUM_SAMPLES];
   int successes = 0;
 
   uint16_t buf[3];
 
-  for (int i = 0; i < NUM_ATTEMPTS; i++) {
+  for (int i = 0; i < NUM_SAMPLES; i++) {
     if (read_sensor_data(buf)) {
       if (buf[0] == buf[1] == buf[2] && buf[0] > 500) {
         Serial.println("faulty measurement, all values are equal and very large. discarding");
@@ -193,22 +207,14 @@ bool sample_sensor(int* arr) {
     delay(SAMPLE_DELAY);
   }
 
-  if (successes == 0) {
+  if (successes < MIN_SAMPLES_FOR_SUCCESS) {
+    Serial.println("failed to get minimum number of samples");
     return false;
   }
 
-  int pm1_0_agg = 0;
-  int pm2_5_agg = 0;
-  int pm10_0_agg = 0;
-  for (int i = 0; i < successes; i++) {
-    pm1_0_agg += pm1_0[i];
-    pm2_5_agg += pm2_5[i];
-    pm10_0_agg += pm10_0[i];
-  }
-
-  arr[0] = pm1_0_agg / successes;
-  arr[1] = pm2_5_agg / successes;
-  arr[2] = pm10_0_agg / successes;
+  arr[0] = median_value(pm1_0, successes);
+  arr[1] = median_value(pm2_5, successes);
+  arr[2] = median_value(pm10_0, successes);
 
   return true;
 }

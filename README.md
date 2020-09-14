@@ -21,6 +21,17 @@ Software:
 
 * InfluxDB v1.8
 
+Wire the sensor as follows:
+
+* Pin1: `VU`
+* Pin2: `Ground`
+* Pin4: `D1`
+* Pin5: `D2`
+
+A 3D printable case for Anton is available at [PrusaPrinters][].
+
+[PrusaPrinters]: https://www.prusaprinters.org/prints/40746-case-for-anton-air-quality-influxdb
+
 ## Installation
 
 This is built using [PlatformIO][]; refer to their docs on building/uploading.
@@ -39,6 +50,12 @@ Measurements are submitted to the configured database as a measurement named
 * `p1_0` PM1.0
 * `p2_5` PM2.5
 * `p10_0` PM10
+
+**Note:** If you need to change settings after initial configuration, change the
+source code by uncommenting out the `reset_all();` statement in the `setup()`
+method of `main.cpp`, upload the firmware, wait for it to reset, then re-comment
+the line and upload. Probably I'll fix this at some point, but this is how you
+do it for now.
 
 [PlatformIO]: https://platformio.org/
 

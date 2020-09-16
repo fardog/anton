@@ -22,11 +22,15 @@ char influxdb_url[200] = "";
 bool configured = false;
 bool should_save_config = false;
 
+int wakeup_fail_counter = 0;
+
 static const int NUM_SAMPLES = 10;
 static const int MIN_SAMPLES_FOR_SUCCESS = 4;
+static const int SENSOR_STARTUP_DELAY = 10000;
 static const int SAMPLE_DELAY = 3000;
-static const int MEASUREMENT_DELAY = 30000;
+static const int MEASUREMENT_DELAY = 60000;
 static const int MAX_JSON_DOCUMENT_SIZE = 2048;
+static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const char *URL_TEMPLATE = "http://%s:%s/write?db=%s";
 static const char *MEASUREMENT_TEMPLATE = "particulate_matter,node=%s p1_0=%d,p2_5=%d,p10_0=%d";
 
@@ -43,6 +47,17 @@ void reset_all()
 {
   WiFi.disconnect();
   SPIFFS.format();
+}
+
+// reset the system; forces the watchdog timer to reset us, called if something
+// goes wrong
+void reset()
+{
+  wdt_disable();
+  wdt_enable(WDTO_15MS);
+  while (1)
+  {
+  }
 }
 
 void read_config()
@@ -277,10 +292,29 @@ void loop()
     return;
   }
 
+  // wake sensor
   if (ZH03B.wakeup())
   {
     Serial.println("loop: sensor wakeup successfully");
+    wakeup_fail_counter = 0;
   }
+  else if (wakeup_fail_counter >= MAX_SENSOR_WAKE_FAIL)
+  {
+    Serial.printf("loop: ERROR failed to wake sensor %d times; resetting", wakeup_fail_counter);
+    reset();
+    return;
+  }
+  else
+  {
+    Serial.println("loop: ERROR failed to wake the sensor; delaying and tryng again");
+    wakeup_fail_counter += 1;
+    delay(30000);
+    return;
+  }
+
+  // delay after sensor start; waking the sensor starts its fan, and we want to
+  // wait for a period before actually sampling it.
+  delay(SENSOR_STARTUP_DELAY);
 
   int sample[3];
   bool success = sample_sensor(sample);
@@ -293,8 +327,15 @@ void loop()
     Serial.println("loop: failed to sample sensor");
   }
 
+  // shut down sensor, stopping its fan.
   if (ZH03B.sleep())
+  {
     Serial.println("loop: sensor sleep successful");
+  }
+  else
+  {
+    Serial.println("loop: ERROR failed to sleep the sensor");
+  }
 
   if (success)
   {

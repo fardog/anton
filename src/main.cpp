@@ -12,6 +12,8 @@
 #include <SD_ZH03B.h>
 #include <SoftwareSerial.h>
 
+#include "strings.h"
+
 char sensor_name[40] = "anton-default";
 char influxdb_server[100] = "influxdb";
 char influxdb_port[6] = "8086";
@@ -23,6 +25,9 @@ bool configured = false;
 bool should_save_config = false;
 
 int wakeup_fail_counter = 0;
+int last_measured = 0;
+int last_values[3] = {0, 0, 0};
+char last_status[10] = "NONE";
 
 static const int NUM_SAMPLES = 10;
 static const int MIN_SAMPLES_FOR_SUCCESS = 4;
@@ -37,27 +42,36 @@ static const char *MEASUREMENT_TEMPLATE = "particulate_matter,node=%s p1_0=%d,p2
 SoftwareSerial ZHSerial(D1, D2); // RX, TX
 SD_ZH03B ZH03B(ZHSerial);
 
+// web server; we only start this once configured, otherwise we rely on the
+// configuration page that WiFiManager provides.
+ESP8266WebServer server(80);
+
 void save_config_callback()
 {
   Serial.println("config: should save config");
   should_save_config = true;
 }
 
+void _delay(unsigned long ms)
+{
+  const int now = millis();
+
+  while (1)
+  {
+    server.handleClient();
+    delay(100);
+    if (millis() - now > ms)
+    {
+      break;
+    }
+  }
+}
+
 void reset_all()
 {
   WiFi.disconnect();
   SPIFFS.format();
-}
-
-// reset the system; forces the watchdog timer to reset us, called if something
-// goes wrong
-void reset()
-{
-  wdt_disable();
-  wdt_enable(WDTO_15MS);
-  while (1)
-  {
-  }
+  ESP.restart();
 }
 
 void read_config()
@@ -133,6 +147,103 @@ void save_config()
   configured = true;
 }
 
+void render_index_page(char *buf)
+{
+  int last = -1;
+  if (last_measured > 0)
+  {
+    last = (millis() - last_measured) / 1000;
+  }
+  sprintf(
+      buf,
+      serverIndex,
+      last,
+      last_status,
+      last_values[0],
+      last_values[1],
+      last_values[2],
+      millis() / 1000,
+      sensor_name,
+      influxdb_url);
+}
+
+void run_http_server()
+{
+  server.on("/", HTTP_GET, []() {
+    Serial.println("http: serving index");
+    server.sendHeader("Connection", "close");
+    char buf[1024] = "";
+    render_index_page(buf);
+    server.send(200, "text/html", buf);
+  });
+
+  server.on("/reset", HTTP_GET, []() {
+    Serial.println("http: serving reset");
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", resetPage);
+  });
+
+  server.on("/reboot", HTTP_POST, []() {
+    Serial.println("http: serving reboot");
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", "rebooting");
+    ESP.restart();
+  });
+
+  server.on("/reset-confirm", HTTP_POST, []() {
+    Serial.println("http: serving reset confirm");
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", "resetting");
+    reset_all();
+  });
+
+  server.on(
+      "/update",
+      HTTP_POST,
+      []() {
+        server.sendHeader("Connection", "close");
+        server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+        ESP.restart();
+      },
+      []() {
+        HTTPUpload &upload = server.upload();
+        if (upload.status == UPLOAD_FILE_START)
+        {
+          Serial.setDebugOutput(true);
+          WiFiUDP::stopAll();
+          Serial.printf("Update: %s\n", upload.filename.c_str());
+          uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+          if (!Update.begin(maxSketchSpace))
+          { //start with max available size
+            Update.printError(Serial);
+          }
+        }
+        else if (upload.status == UPLOAD_FILE_WRITE)
+        {
+          if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
+          {
+            Update.printError(Serial);
+          }
+        }
+        else if (upload.status == UPLOAD_FILE_END)
+        {
+          if (Update.end(true))
+          { //true to set the size to the current progress
+            Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+          }
+          else
+          {
+            Update.printError(Serial);
+          }
+          Serial.setDebugOutput(false);
+        }
+        yield();
+      });
+
+  Serial.println("http: running server");
+  server.begin();
+}
+
 void setup()
 {
   Serial.begin(9600);
@@ -168,6 +279,9 @@ void setup()
   {
     save_config();
   }
+
+  // start http server
+  run_http_server();
 
   // set up ZH03B sensor
   ZHSerial.begin(9600);
@@ -241,7 +355,7 @@ bool sample_sensor(int *arr)
         Serial.printf("sensor: sample PM1.0, PM2.5, PM10=[%d, %d, %d]\n", buf[0], buf[1], buf[2]);
       }
     }
-    delay(SAMPLE_DELAY);
+    _delay(SAMPLE_DELAY);
   }
 
   if (successes < MIN_SAMPLES_FOR_SUCCESS)
@@ -301,30 +415,37 @@ void loop()
   else if (wakeup_fail_counter >= MAX_SENSOR_WAKE_FAIL)
   {
     Serial.printf("loop: ERROR failed to wake sensor %d times; resetting", wakeup_fail_counter);
-    reset();
+    ESP.restart();
     return;
   }
   else
   {
-    Serial.println("loop: ERROR failed to wake the sensor; delaying and tryng again");
+    Serial.println("loop: ERROR failed to wake the sensor; delaying and trying again");
     wakeup_fail_counter += 1;
-    delay(30000);
+    _delay(30000);
     return;
   }
 
   // delay after sensor start; waking the sensor starts its fan, and we want to
   // wait for a period before actually sampling it.
-  delay(SENSOR_STARTUP_DELAY);
+  _delay(SENSOR_STARTUP_DELAY);
 
   int sample[3];
   bool success = sample_sensor(sample);
   if (success)
   {
     Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n", sample[0], sample[1], sample[2]);
+    for (int i = 0; i < 3; i++)
+    {
+      last_values[i] = sample[i];
+    }
+    last_measured = millis();
+    strcpy(last_status, "SUCCESS");
   }
   else
   {
     Serial.println("loop: failed to sample sensor");
+    strcpy(last_status, "FAILURE");
   }
 
   // shut down sensor, stopping its fan.
@@ -349,5 +470,5 @@ void loop()
     }
   }
 
-  delay(MEASUREMENT_DELAY);
+  _delay(MEASUREMENT_DELAY);
 }

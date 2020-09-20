@@ -5,13 +5,13 @@ const char *serverIndex = R"(
     <h1>Measurements</h1>
     Measured %d seconds ago; last result was %s.
     <dl>
-      <dt>PM10</dt>
+      <dt>PM1.0</dt>
       <dd>%d</dd>
 
       <dt>PM2.5</dt>
       <dd>%d</dd>
 
-      <dt>PM1.0</dt>
+      <dt>PM10</dt>
       <dd>%d</dd>
     </dl>
     <h1>Stats</h1>

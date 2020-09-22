@@ -11,6 +11,7 @@
 
 #include <SD_ZH03B.h>
 #include <SoftwareSerial.h>
+#include <AQI.h>
 
 #include "strings.h"
 
@@ -37,6 +38,7 @@ static const int MEASUREMENT_DELAY = 60000;
 static const int MAX_JSON_DOCUMENT_SIZE = 2048;
 static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const char *URL_TEMPLATE = "http://%s:%s/write?db=%s";
+static const char *MEASUREMENT_TEMPLATE_AQI = "particulate_matter,node=%s p1_0=%d,p2_5=%d,p10_0=%d,aqi=%d,aqi_contributor=%s";
 static const char *MEASUREMENT_TEMPLATE = "particulate_matter,node=%s p1_0=%d,p2_5=%d,p10_0=%d";
 
 SoftwareSerial ZHSerial(D1, D2); // RX, TX
@@ -371,15 +373,64 @@ bool sample_sensor(int *arr)
   return true;
 }
 
-bool post_measurement(int *values)
+struct CalculatedAQI
 {
+  float value;
+  char *pollutant;
+};
+
+bool calculate_aqi(int *values, CalculatedAQI *aqi)
+{
+  AQI::Measurement list[2] = {
+      AQI::Measurement(AQI::PM2_5, values[1]),
+      AQI::Measurement(AQI::PM10, values[2])};
+
+  AQI::Measurements measurements = AQI::Measurements(list, 2);
+
+  aqi->value = measurements.getAQI();
+  if (aqi->value == -1)
+  {
+    return false;
+  }
+
+  AQI::Pollutant pollutant = measurements.getPollutant();
+  switch (pollutant)
+  {
+  case AQI::PM2_5:
+    strcpy(aqi->pollutant, "p2_5");
+    break;
+  case AQI::PM10:
+    strcpy(aqi->pollutant, "p10_0");
+    break;
+  default:
+    return false;
+  }
+
+  return true;
+}
+
+void format_measurement(char *buf, int *values, CalculatedAQI *aqi)
+{
+  if (aqi)
+  {
+    int aqi_value = round(aqi->value);
+    sprintf(buf, MEASUREMENT_TEMPLATE_AQI, sensor_name, values[0], values[1], values[2], aqi_value, aqi->pollutant);
+  }
+  else
+  {
+    sprintf(buf, MEASUREMENT_TEMPLATE, sensor_name, values[0], values[1], values[2]);
+  }
+}
+
+bool post_measurement(int *values, CalculatedAQI *aqi)
+{
+  char measurement[120];
+  format_measurement(measurement, values, aqi);
+  Serial.printf("influxdb: %s\n", measurement);
+
   bool success = false;
   HTTPClient http;
   http.begin(influxdb_url);
-
-  char measurement[100];
-  sprintf(measurement, MEASUREMENT_TEMPLATE, sensor_name, values[0], values[1], values[2]);
-  Serial.printf("influxdb: %s\n", measurement);
 
   int httpCode = http.POST(measurement);
   if (httpCode == HTTP_CODE_NO_CONTENT)
@@ -460,7 +511,10 @@ void loop()
 
   if (success)
   {
-    if (post_measurement(sample))
+    char pollutant[5];
+    CalculatedAQI aqi = {-1, pollutant};
+
+    if (post_measurement(sample, calculate_aqi(sample, &aqi) ? &aqi : nullptr))
     {
       Serial.println("loop: sample submitted successfully");
     }

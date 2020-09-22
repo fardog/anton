@@ -376,7 +376,7 @@ bool sample_sensor(int *arr)
 struct CalculatedAQI
 {
   float value;
-  char *pollutant;
+  char pollutant[5];
 };
 
 bool calculate_aqi(int *values, CalculatedAQI *aqi)
@@ -511,9 +511,7 @@ void loop()
 
   if (success)
   {
-    char pollutant[5];
-    CalculatedAQI aqi = {-1, pollutant};
-
+    CalculatedAQI aqi;
     if (post_measurement(sample, calculate_aqi(sample, &aqi) ? &aqi : nullptr))
     {
       Serial.println("loop: sample submitted successfully");

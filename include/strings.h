@@ -13,6 +13,12 @@ const char *serverIndex = R"(
 
       <dt>PM10</dt>
       <dd>%d</dd>
+
+      <dt>AQI</dt>
+      <dd>%d</dd>
+
+      <dt>Primary Contributor</dt>
+      <dd>%s</dd>
     </dl>
     <h1>Stats</h1>
     Uptime: %d seconds

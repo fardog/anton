@@ -29,6 +29,8 @@ int wakeup_fail_counter = 0;
 int last_measured = 0;
 int last_values[3] = {0, 0, 0};
 char last_status[10] = "NONE";
+int last_aqi = 0;
+char last_primary_contributor[5] = "NONE";
 
 static const int NUM_SAMPLES = 10;
 static const int MIN_SAMPLES_FOR_SUCCESS = 4;
@@ -38,7 +40,7 @@ static const int MEASUREMENT_DELAY = 60000;
 static const int MAX_JSON_DOCUMENT_SIZE = 2048;
 static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const char *URL_TEMPLATE = "http://%s:%s/write?db=%s";
-static const char *MEASUREMENT_TEMPLATE_AQI = "particulate_matter,node=%s p1_0=%d,p2_5=%d,p10_0=%d,aqi=%d,aqi_contributor=%s";
+static const char *MEASUREMENT_TEMPLATE_AQI = "particulate_matter,node=%s p1_0=%d,p2_5=%d,p10_0=%d,aqi=%d,aqi_contributor=\"%s\"";
 static const char *MEASUREMENT_TEMPLATE = "particulate_matter,node=%s p1_0=%d,p2_5=%d,p10_0=%d";
 
 SoftwareSerial ZHSerial(D1, D2); // RX, TX
@@ -164,6 +166,8 @@ void render_index_page(char *buf)
       last_values[0],
       last_values[1],
       last_values[2],
+      last_aqi,
+      last_primary_contributor,
       millis() / 1000,
       sensor_name,
       influxdb_url);
@@ -512,13 +516,25 @@ void loop()
   if (success)
   {
     CalculatedAQI aqi;
-    if (post_measurement(sample, calculate_aqi(sample, &aqi) ? &aqi : nullptr))
+    bool aqi_success = calculate_aqi(sample, &aqi);
+    if (post_measurement(sample, aqi_success ? &aqi : nullptr))
     {
       Serial.println("loop: sample submitted successfully");
     }
     else
     {
       Serial.println("loop: failed to submit sample");
+    }
+
+    if (aqi_success)
+    {
+      last_aqi = aqi.value;
+      strcpy(last_primary_contributor, aqi.pollutant);
+    }
+    else
+    {
+      last_aqi = -1;
+      strcpy(last_primary_contributor, "NONE");
     }
   }
 

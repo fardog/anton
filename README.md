@@ -36,9 +36,15 @@ A 3D printable case for Anton is available at [PrusaPrinters][].
 
 This is built using [PlatformIO][]; refer to their docs on building/uploading.
 
+[PlatformIO]: https://platformio.org/
+
+## Setup
+
 Once uploaded and booted, a wireless network called `anton-setup` will be
 created; join this network and you will be directed to a captive portal for
 configuration.
+
+## Measurements
 
 Measurements are submitted to the configured database as a measurement named
 `particulate_matter`. It will contain the following tags:
@@ -50,14 +56,20 @@ Measurements are submitted to the configured database as a measurement named
 * `p1_0` PM1.0
 * `p2_5` PM2.5
 * `p10_0` PM10
+* `aqi` EPA AQI
 
-**Note:** If you need to change settings after initial configuration, change the
-source code by uncommenting out the `reset_all();` statement in the `setup()`
-method of `main.cpp`, upload the firmware, wait for it to reset, then re-comment
-the line and upload. Probably I'll fix this at some point, but this is how you
-do it for now.
+…and the following string values:
 
-[PlatformIO]: https://platformio.org/
+* `aqi_contributor` the primary AQI contributor (highest value); the string will
+  match the measurement name, e.g. `p1_0`
+
+**Note:** currently only PM10 and PM2.5 are accounted for in AQI measurements,
+following the EPA standard.
+
+## Administration
+
+Once configured, a webserver is exposed on port 80 which can be used to view
+sensor values, update firmware, and reboot or reset the sensor.
 
 ## Acknowledgements
 

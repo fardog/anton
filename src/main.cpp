@@ -8,6 +8,7 @@
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>
+#include <WiFiClient.h>
 
 #include <SD_ZH03B.h>
 #include <SoftwareSerial.h>
@@ -16,6 +17,7 @@
 #include "strings.h"
 
 char sensor_name[40] = "anton-default";
+char sensor_location[40] = "";
 char influxdb_server[100] = "influxdb";
 char influxdb_port[6] = "8086";
 char influxdb_database[40] = "anton";
@@ -26,6 +28,7 @@ bool configured = false;
 bool should_save_config = false;
 
 int wakeup_fail_counter = 0;
+int connection_fail_counter = 0;
 int last_measured = 0;
 int last_values[3] = {0, 0, 0};
 char last_status[10] = "NONE";
@@ -39,9 +42,10 @@ static const int SAMPLE_DELAY = 3000;
 static const int MEASUREMENT_DELAY = 60000;
 static const int MAX_JSON_DOCUMENT_SIZE = 2048;
 static const int MAX_SENSOR_WAKE_FAIL = 5;
+static const int MAX_CONNECTION_FAIL = 5;
 static const char *URL_TEMPLATE = "http://%s:%s/write?db=%s";
-static const char *MEASUREMENT_TEMPLATE_AQI = "particulate_matter,node=%s p1_0=%d,p2_5=%d,p10_0=%d,aqi=%d,aqi_contributor=\"%s\"";
-static const char *MEASUREMENT_TEMPLATE = "particulate_matter,node=%s p1_0=%d,p2_5=%d,p10_0=%d";
+static const char *MEASUREMENT_TEMPLATE_AQI = "particulate_matter,node=%s,location=%s p1_0=%d,p2_5=%d,p10_0=%d,aqi=%d,aqi_contributor=\"%s\"";
+static const char *MEASUREMENT_TEMPLATE = "particulate_matter,node=%s,location=%s p1_0=%d,p2_5=%d,p10_0=%d";
 
 SoftwareSerial ZHSerial(D1, D2); // RX, TX
 SD_ZH03B ZH03B(ZHSerial);
@@ -109,6 +113,12 @@ void read_config()
           strcpy(influxdb_port, doc["influxdb_port"]);
           strcpy(influxdb_database, doc["influxdb_database"]);
 
+          // values added after the initial firmware, may be unset
+          if (doc["sensor_location"])
+          {
+            strcpy(sensor_location, doc["sensor_location"]);
+          }
+
           configured = true;
         }
         else
@@ -133,6 +143,7 @@ void save_config()
   DynamicJsonDocument doc(MAX_JSON_DOCUMENT_SIZE);
 
   doc["sensor_name"] = sensor_name;
+  doc["sensor_location"] = sensor_location;
   doc["influxdb_server"] = influxdb_server;
   doc["influxdb_port"] = influxdb_port;
   doc["influxdb_database"] = influxdb_database;
@@ -254,13 +265,14 @@ void setup()
 {
   Serial.begin(9600);
   WiFiManager wifiManager;
-  // reset_all();
   wifiManager.setSaveConfigCallback(save_config_callback);
 
   read_config();
 
   WiFiManagerParameter sensor_name_param("sensor_name", "sensor name", sensor_name, 40);
   wifiManager.addParameter(&sensor_name_param);
+  WiFiManagerParameter sensor_location_param("sensor_location", "sensor location", sensor_location, 40);
+  wifiManager.addParameter(&sensor_location_param);
   WiFiManagerParameter influxdb_server_param("influxdb_server", "influxdb server", influxdb_server, 100);
   wifiManager.addParameter(&influxdb_server_param);
   WiFiManagerParameter influxdb_port_param("influxdb_port", "influxdb port", influxdb_port, 6);
@@ -273,6 +285,7 @@ void setup()
 
   //read updated parameters
   strcpy(sensor_name, sensor_name_param.getValue());
+  strcpy(sensor_location, sensor_location_param.getValue());
   strcpy(influxdb_server, influxdb_server_param.getValue());
   strcpy(influxdb_port, influxdb_port_param.getValue());
   strcpy(influxdb_database, influxdb_database_param.getValue());
@@ -418,11 +431,25 @@ void format_measurement(char *buf, int *values, CalculatedAQI *aqi)
   if (aqi)
   {
     int aqi_value = round(aqi->value);
-    sprintf(buf, MEASUREMENT_TEMPLATE_AQI, sensor_name, values[0], values[1], values[2], aqi_value, aqi->pollutant);
+    sprintf(buf,
+            MEASUREMENT_TEMPLATE_AQI,
+            sensor_name,
+            sensor_location,
+            values[0],
+            values[1],
+            values[2],
+            aqi_value,
+            aqi->pollutant);
   }
   else
   {
-    sprintf(buf, MEASUREMENT_TEMPLATE, sensor_name, values[0], values[1], values[2]);
+    sprintf(buf,
+            MEASUREMENT_TEMPLATE,
+            sensor_name,
+            sensor_location,
+            values[0],
+            values[1],
+            values[2]);
   }
 }
 
@@ -459,6 +486,23 @@ void loop()
     reset_all();
     delay(5000);
     return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    Serial.println("loop: wifi not connected; delaying");
+    connection_fail_counter++;
+    if (connection_fail_counter > 10)
+    {
+      Serial.println("loop: exceeded wifi connection failures, restarting");
+      ESP.restart();
+    }
+    _delay(30000);
+    return;
+  }
+  else
+  {
+    connection_fail_counter = 0;
   }
 
   // wake sensor

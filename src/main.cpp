@@ -182,6 +182,18 @@ void render_index_page(char *buf)
       influxdb_url);
 }
 
+void render_config_page(char *buf)
+{
+  sprintf(
+      buf,
+      configPage,
+      sensor_name,
+      sensor_location,
+      influxdb_server,
+      influxdb_port,
+      influxdb_database);
+}
+
 void run_http_server()
 {
   server.on("/", HTTP_GET, []() {
@@ -190,6 +202,47 @@ void run_http_server()
     char buf[1024] = "";
     render_index_page(buf);
     server.send(200, "text/html", buf);
+  });
+
+  server.on("/config", HTTP_GET, []() {
+    Serial.println("http: serving config");
+    server.sendHeader("Connection", "close");
+    char buf[2048] = "";
+    render_config_page(buf);
+    server.send(200, "text/html", buf);
+  });
+
+  server.on("/config", HTTP_POST, []() {
+    Serial.println("http: saving config");
+
+    if (server.hasArg("sensor_name"))
+    {
+      strcpy(sensor_name, server.arg("sensor_name").c_str());
+    }
+    if (server.hasArg("sensor_location"))
+    {
+      strcpy(sensor_location, server.arg("sensor_location").c_str());
+    }
+    if (server.hasArg("influxdb_server"))
+    {
+      strcpy(influxdb_server, server.arg("influxdb_server").c_str());
+    }
+    if (server.hasArg("influxdb_port"))
+    {
+      strcpy(influxdb_port, server.arg("influxdb_port").c_str());
+    }
+    if (server.hasArg("influxdb_database"))
+    {
+      strcpy(influxdb_database, server.arg("influxdb_database").c_str());
+    }
+
+    save_config();
+    Serial.println("http: config saved, restarting");
+
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", "saved, restarting");
+    _delay(100);
+    ESP.restart();
   });
 
   server.on("/reset", HTTP_GET, []() {

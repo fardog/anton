@@ -50,6 +50,7 @@ Measurements are submitted to the configured database as a measurement named
 `particulate_matter`. It will contain the following tags:
 
 * `node` the sensor name
+* `location` (optional) the sensor location
 
 …and the following fields containing integer values:
 
@@ -66,10 +67,14 @@ Measurements are submitted to the configured database as a measurement named
 **Note:** currently only PM10 and PM2.5 are accounted for in AQI measurements,
 following the EPA standard.
 
+**Note:** if the AQI cannot be determined, either due to overflow or other
+error, it will be omitted from the InfluxDB submission.
+
 ## Administration
 
 Once configured, a webserver is exposed on port 80 which can be used to view
-sensor values, update firmware, and reboot or reset the sensor.
+sensor values, update firmware, change configuration, and reboot or reset the
+sensor.
 
 ## Acknowledgements
 

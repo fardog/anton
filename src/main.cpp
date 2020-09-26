@@ -44,8 +44,6 @@ static const int MAX_JSON_DOCUMENT_SIZE = 2048;
 static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const int MAX_CONNECTION_FAIL = 5;
 static const char *URL_TEMPLATE = "http://%s:%s/write?db=%s";
-static const char *MEASUREMENT_TEMPLATE_AQI = "particulate_matter,node=%s,location=%s p1_0=%d,p2_5=%d,p10_0=%d,aqi=%d,aqi_contributor=\"%s\"";
-static const char *MEASUREMENT_TEMPLATE = "particulate_matter,node=%s,location=%s p1_0=%d,p2_5=%d,p10_0=%d";
 
 SoftwareSerial ZHSerial(D1, D2); // RX, TX
 SD_ZH03B ZH03B(ZHSerial);
@@ -428,34 +426,24 @@ bool calculate_aqi(int *values, CalculatedAQI *aqi)
 
 void format_measurement(char *buf, int *values, CalculatedAQI *aqi)
 {
+  String measurement = "particulate_matter,node=" + String(sensor_name);
+  if (strcmp(sensor_location, ""))
+  {
+    measurement += ",location=" + String(sensor_location);
+  }
+  measurement += " p1_0=" + String(values[0]) + ",p2_5=" + String(values[1]) + ",p10_0=" + String(values[2]);
   if (aqi)
   {
     int aqi_value = round(aqi->value);
-    sprintf(buf,
-            MEASUREMENT_TEMPLATE_AQI,
-            sensor_name,
-            sensor_location,
-            values[0],
-            values[1],
-            values[2],
-            aqi_value,
-            aqi->pollutant);
+    measurement += ",aqi=" + String(aqi_value) + ",aqi_contributor=\"" + String(aqi->pollutant) + "\"";
   }
-  else
-  {
-    sprintf(buf,
-            MEASUREMENT_TEMPLATE,
-            sensor_name,
-            sensor_location,
-            values[0],
-            values[1],
-            values[2]);
-  }
+
+  strcpy(buf, measurement.c_str());
 }
 
 bool post_measurement(int *values, CalculatedAQI *aqi)
 {
-  char measurement[120];
+  char measurement[256];
   format_measurement(measurement, values, aqi);
   Serial.printf("influxdb: %s\n", measurement);
 

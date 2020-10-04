@@ -76,6 +76,10 @@ Once configured, a webserver is exposed on port 80 which can be used to view
 sensor values, update firmware, change configuration, and reboot or reset the
 sensor.
 
+**Note:** earlier versions of Anton submitted values to InfluxDB as floats; this
+has been corrected to use integer values. Updating will require you to either
+use a new database or rewrite your existing one.
+
 ## Acknowledgements
 
 This was very quick to implement due to

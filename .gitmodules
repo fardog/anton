@@ -4,3 +4,6 @@
 [submodule "lib/aqi"]
 	path = lib/aqi
 	url = git@github.com:fardog/aqi-cpp.git
+[submodule "lib/influxdb"]
+	path = lib/influxdb
+	url = git@github.com:tobiasschuerg/InfluxDB-Client-for-Arduino.git

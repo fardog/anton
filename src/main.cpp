@@ -2,14 +2,13 @@
 
 #include <ArduinoJson.h>
 
-#include <ESP8266HTTPClient.h>
-
 #include <ESP8266WiFi.h>
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>
 #include <WiFiClient.h>
 
+#include <InfluxDbClient.h>
 #include <SD_ZH03B.h>
 #include <SoftwareSerial.h>
 #include <AQI.h>
@@ -43,10 +42,10 @@ static const int MEASUREMENT_DELAY = 60000;
 static const int MAX_JSON_DOCUMENT_SIZE = 2048;
 static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const int MAX_CONNECTION_FAIL = 5;
-static const char *URL_TEMPLATE = "http://%s:%s/write?db=%s";
 
 SoftwareSerial ZHSerial(D1, D2); // RX, TX
 SD_ZH03B ZH03B(ZHSerial);
+InfluxDBClient InfluxDB;
 
 // web server; we only start this once configured, otherwise we rely on the
 // configuration page that WiFiManager provides.
@@ -342,7 +341,7 @@ void setup()
   strcpy(influxdb_database, influxdb_database_param.getValue());
 
   // create influxdb url
-  sprintf(influxdb_url, URL_TEMPLATE, influxdb_server, influxdb_port, influxdb_database);
+  sprintf(influxdb_url, "http://%s:%s", influxdb_server, influxdb_port);
   Serial.printf("setup: influxdb url: %s\n", influxdb_url);
 
   if (should_save_config)
@@ -352,6 +351,8 @@ void setup()
 
   // start http server
   run_http_server();
+
+  InfluxDB.setConnectionParamsV1(influxdb_url, influxdb_database);
 
   // set up ZH03B sensor
   ZHSerial.begin(9600);
@@ -477,44 +478,33 @@ bool calculate_aqi(int *values, CalculatedAQI *aqi)
   return true;
 }
 
-void format_measurement(char *buf, int *values, CalculatedAQI *aqi)
-{
-  String measurement = "particulate_matter,node=" + String(sensor_name);
-  if (strcmp(sensor_location, ""))
-  {
-    measurement += ",location=" + String(sensor_location);
-  }
-  measurement += " p1_0=" + String(values[0]) + ",p2_5=" + String(values[1]) + ",p10_0=" + String(values[2]);
-  if (aqi)
-  {
-    int aqi_value = round(aqi->value);
-    measurement += ",aqi=" + String(aqi_value) + ",aqi_contributor=\"" + String(aqi->pollutant) + "\"";
-  }
-
-  strcpy(buf, measurement.c_str());
-}
-
 bool post_measurement(int *values, CalculatedAQI *aqi)
 {
-  char measurement[256];
-  format_measurement(measurement, values, aqi);
-  Serial.printf("influxdb: %s\n", measurement);
-
-  bool success = false;
-  HTTPClient http;
-  http.begin(influxdb_url);
-
-  int httpCode = http.POST(measurement);
-  if (httpCode == HTTP_CODE_NO_CONTENT)
+  Point measurement("particulate_matter");
+  measurement.addTag("node", sensor_name);
+  if (strcmp(sensor_location, ""))
   {
-    success = true;
-  }
-  else
-  {
-    Serial.printf("influxdb: failed with status: %d\n", httpCode);
+    measurement.addTag("location", sensor_location);
   }
 
-  http.end();
+  measurement.addField("p1_0", values[0]);
+  measurement.addField("p2_5", values[1]);
+  measurement.addField("p10_0", values[2]);
+
+  if (aqi)
+  {
+    measurement.addField("aqi", (int)round(aqi->value));
+    measurement.addField("aqi_contributor", aqi->pollutant);
+  }
+
+  Serial.print("post_measurement: ");
+  Serial.println(measurement.toLineProtocol());
+
+  bool success = InfluxDB.writePoint(measurement);
+  if (!success)
+  {
+    Serial.println(InfluxDB.getLastErrorMessage());
+  }
 
   return success;
 }

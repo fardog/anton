@@ -9,11 +9,12 @@
 #include <WiFiClient.h>
 
 #include <InfluxDbClient.h>
-#include <SD_ZH03B.h>
 #include <SoftwareSerial.h>
 #include <AQI.h>
 
 #include "strings.h"
+#include "AirSensor.h"
+#include "ZH03B_AirSensor.h"
 
 char sensor_name[40] = "anton-default";
 char sensor_location[40] = "";
@@ -44,8 +45,8 @@ static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const int MAX_CONNECTION_FAIL = 5;
 
 SoftwareSerial ZHSerial(D1, D2); // RX, TX
-SD_ZH03B ZH03B(ZHSerial);
 InfluxDBClient InfluxDB;
+AirSensor *sensor;
 
 // web server; we only start this once configured, otherwise we rely on the
 // configuration page that WiFiManager provides.
@@ -357,43 +358,26 @@ void setup()
   // set up ZH03B sensor
   ZHSerial.begin(9600);
   delay(100);
-  ZH03B.setMode(SD_ZH03B::IU_MODE);
+  ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
+  sensor = ZH;
   delay(200);
 
-  if (ZH03B.sleep())
+  if (sensor->sleep())
   {
     Serial.println("setup: sleep confirmed");
   }
 }
 
-bool read_sensor_data(uint16_t *arr)
+int sort_int_desc(const void *cmp1, const void *cmp2)
 {
-  Serial.println("sensor: sampling");
-  if (ZH03B.readData())
-  {
-    arr[0] = ZH03B.getPM1_0();
-    arr[1] = ZH03B.getPM2_5();
-    arr[2] = ZH03B.getPM10_0();
-
-    return true;
-  }
-  else
-  {
-    Serial.println("sensor: Error reading stream or Check Sum Error");
-    return false;
-  }
-}
-
-int sort_uint16_desc(const void *cmp1, const void *cmp2)
-{
-  uint16_t a = *((uint16_t *)cmp1);
-  uint16_t b = *((uint16_t *)cmp2);
+  int a = *((int *)cmp1);
+  int b = *((int *)cmp2);
   return b - a;
 }
 
-uint16_t median_value(uint16_t *values, int count)
+int median_value(int *values, int count)
 {
-  qsort(values, count, sizeof(values[0]), sort_uint16_desc);
+  qsort(values, count, sizeof(values[0]), sort_int_desc);
 
   return values[(count / 2) - 1];
 }
@@ -401,29 +385,28 @@ uint16_t median_value(uint16_t *values, int count)
 bool sample_sensor(int *arr)
 {
   Serial.println("sensor: attemping average sample");
-  uint16_t pm1_0[NUM_SAMPLES];
-  uint16_t pm2_5[NUM_SAMPLES];
-  uint16_t pm10_0[NUM_SAMPLES];
+  int pm1_0[NUM_SAMPLES];
+  int pm2_5[NUM_SAMPLES];
+  int pm10_0[NUM_SAMPLES];
   int successes = 0;
 
-  uint16_t buf[3];
-
+  AirData buf;
   for (int i = 0; i < NUM_SAMPLES; i++)
   {
-    if (read_sensor_data(buf))
+    if (sensor->getAirData(&buf))
     {
-      if (buf[0] == buf[1] == buf[2] && buf[0] > 500)
+      if (buf.p1_0 == buf.p2_5 == buf.p10_0 && buf.p1_0 > 500)
       {
         Serial.println("sensor: faulty measurement, all values are equal and very large. discarding");
       }
       else
       {
-        pm1_0[successes] = buf[0];
-        pm2_5[successes] = buf[1];
-        pm10_0[successes] = buf[2];
+        pm1_0[successes] = buf.p1_0;
+        pm2_5[successes] = buf.p2_5;
+        pm10_0[successes] = buf.p10_0;
         successes++;
 
-        Serial.printf("sensor: sample PM1.0, PM2.5, PM10=[%d, %d, %d]\n", buf[0], buf[1], buf[2]);
+        Serial.printf("sensor: sample PM1.0, PM2.5, PM10=[%d, %d, %d]\n", buf.p1_0, buf.p2_5, buf.p10_0);
       }
     }
     _delay(SAMPLE_DELAY);
@@ -537,7 +520,7 @@ void loop()
   }
 
   // wake sensor
-  if (ZH03B.wakeup())
+  if (sensor->wake())
   {
     Serial.println("loop: sensor wakeup successfully");
     wakeup_fail_counter = 0;
@@ -579,7 +562,7 @@ void loop()
   }
 
   // shut down sensor, stopping its fan.
-  if (ZH03B.sleep())
+  if (sensor->sleep())
   {
     Serial.println("loop: sensor sleep successful");
   }

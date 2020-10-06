@@ -3,9 +3,9 @@
 
 struct AirData
 {
-    int p1_0;
-    int p2_5;
-    int p10_0;
+    uint16_t p1_0;
+    uint16_t p2_5;
+    uint16_t p10_0;
 };
 
 class AirSensor

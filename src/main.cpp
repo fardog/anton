@@ -361,16 +361,16 @@ void setup()
   sensor = ZH;
 }
 
-int sort_int_desc(const void *cmp1, const void *cmp2)
+int sort_uint16_desc(const void *cmp1, const void *cmp2)
 {
-  int a = *((int *)cmp1);
-  int b = *((int *)cmp2);
+  uint16_t a = *((uint16_t *)cmp1);
+  uint16_t b = *((uint16_t *)cmp2);
   return b - a;
 }
 
-int median_value(int *values, int count)
+int median_value(uint16_t *values, int count)
 {
-  qsort(values, count, sizeof(values[0]), sort_int_desc);
+  qsort(values, count, sizeof(values[0]), sort_uint16_desc);
 
   return values[(count / 2) - 1];
 }
@@ -378,9 +378,9 @@ int median_value(int *values, int count)
 bool sample_sensor(int *arr)
 {
   Serial.println("sensor: attemping average sample");
-  int pm1_0[NUM_SAMPLES];
-  int pm2_5[NUM_SAMPLES];
-  int pm10_0[NUM_SAMPLES];
+  uint16_t pm1_0[NUM_SAMPLES];
+  uint16_t pm2_5[NUM_SAMPLES];
+  uint16_t pm10_0[NUM_SAMPLES];
   int successes = 0;
 
   AirData buf;

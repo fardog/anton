@@ -241,7 +241,7 @@ void run_http_server()
 
     server.sendHeader("Connection", "close");
     server.send(200, "text/plain", "saved, restarting");
-    _delay(100);
+    delay(100);
     ESP.restart();
   });
 

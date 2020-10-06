@@ -357,15 +357,8 @@ void setup()
 
   // set up ZH03B sensor
   ZHSerial.begin(9600);
-  delay(100);
   ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
   sensor = ZH;
-  delay(200);
-
-  if (sensor->sleep())
-  {
-    Serial.println("setup: sleep confirmed");
-  }
 }
 
 int sort_int_desc(const void *cmp1, const void *cmp2)

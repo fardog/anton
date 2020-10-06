@@ -368,7 +368,7 @@ int sort_uint16_desc(const void *cmp1, const void *cmp2)
   return b - a;
 }
 
-int median_value(uint16_t *values, int count)
+uint16_t median_value(uint16_t *values, int count)
 {
   qsort(values, count, sizeof(values[0]), sort_uint16_desc);
 

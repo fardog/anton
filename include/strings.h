@@ -41,6 +41,10 @@ const char *serverIndex = R"(
     </form>
     <h1>Reset</h1>
     Visit the <a href="/reset">reset page</a>.
+    <footer>
+      <hr>
+      anton: revision %s
+    </footer>
   </body>
 </html>
 )";

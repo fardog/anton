@@ -16,6 +16,10 @@
 #include "AirSensor.h"
 #include "ZH03B_AirSensor.h"
 
+#ifndef GIT_REV
+#define GIT_REV "Unknown"
+#endif
+
 char sensor_name[40] = "anton-default";
 char sensor_location[40] = "";
 char influxdb_server[100] = "influxdb";
@@ -179,7 +183,8 @@ void render_index_page(char *buf)
       last_primary_contributor,
       millis() / 1000,
       sensor_name,
-      influxdb_url);
+      influxdb_url,
+      GIT_REV);
 }
 
 void render_config_page(char *buf)
@@ -315,6 +320,7 @@ void run_http_server()
 void setup()
 {
   Serial.begin(9600);
+  Serial.printf("setup: starting version %s\n", GIT_REV);
   WiFiManager wifiManager;
   wifiManager.setSaveConfigCallback(save_config_callback);
 

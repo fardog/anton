@@ -1,3 +1,6 @@
+#ifndef strings_h
+#define strings_h
+
 const char *serverIndex = R"(
 <!DOCTYPE html>
 <html>
@@ -103,3 +106,5 @@ const char *configPage = R"(
   </body>
 </html>
 )";
+
+#endif

@@ -13,8 +13,8 @@
 #include <AQI.h>
 
 #include "strings.h"
-#include "AirSensor.h"
-#include "ZH03B_AirSensor.h"
+#include "sensors/AirSensor.h"
+#include "sensors/ZH03B_AirSensor.h"
 
 #ifndef GIT_REV
 #define GIT_REV "Unknown"

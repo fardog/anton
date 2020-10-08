@@ -34,7 +34,7 @@ bool should_save_config = false;
 int wakeup_fail_counter = 0;
 int connection_fail_counter = 0;
 int last_measured = 0;
-int last_values[3] = {0, 0, 0};
+AirData last_values;
 char last_status[10] = "NONE";
 int last_aqi = 0;
 char last_primary_contributor[5] = "NONE";
@@ -176,9 +176,9 @@ void render_index_page(char *buf)
       serverIndex,
       last,
       last_status,
-      last_values[0],
-      last_values[1],
-      last_values[2],
+      last_values.p1_0,
+      last_values.p2_5,
+      last_values.p10_0,
       last_aqi,
       last_primary_contributor,
       millis() / 1000,
@@ -381,7 +381,7 @@ uint16_t median_value(uint16_t *values, int count)
   return values[(count / 2) - 1];
 }
 
-bool sample_sensor(int *arr)
+bool sample_sensor(AirData *sample)
 {
   Serial.println("sensor: attemping average sample");
   uint16_t pm1_0[NUM_SAMPLES];
@@ -417,9 +417,9 @@ bool sample_sensor(int *arr)
     return false;
   }
 
-  arr[0] = median_value(pm1_0, successes);
-  arr[1] = median_value(pm2_5, successes);
-  arr[2] = median_value(pm10_0, successes);
+  sample->p1_0 = median_value(pm1_0, successes);
+  sample->p2_5 = median_value(pm2_5, successes);
+  sample->p10_0 = median_value(pm10_0, successes);
 
   return true;
 }
@@ -430,11 +430,11 @@ struct CalculatedAQI
   char pollutant[5];
 };
 
-bool calculate_aqi(int *values, CalculatedAQI *aqi)
+bool calculate_aqi(AirData sample, CalculatedAQI *aqi)
 {
   AQI::Measurement list[2] = {
-      AQI::Measurement(AQI::PM2_5, values[1]),
-      AQI::Measurement(AQI::PM10, values[2])};
+      AQI::Measurement(AQI::PM2_5, sample.p2_5),
+      AQI::Measurement(AQI::PM10, sample.p10_0)};
 
   AQI::Measurements measurements = AQI::Measurements(list, 2);
 
@@ -460,7 +460,7 @@ bool calculate_aqi(int *values, CalculatedAQI *aqi)
   return true;
 }
 
-bool post_measurement(int *values, CalculatedAQI *aqi)
+bool post_measurement(AirData sample, CalculatedAQI *aqi)
 {
   Point measurement("particulate_matter");
   measurement.addTag("node", sensor_name);
@@ -469,9 +469,9 @@ bool post_measurement(int *values, CalculatedAQI *aqi)
     measurement.addTag("location", sensor_location);
   }
 
-  measurement.addField("p1_0", values[0]);
-  measurement.addField("p2_5", values[1]);
-  measurement.addField("p10_0", values[2]);
+  measurement.addField("p1_0", (int)sample.p1_0);
+  measurement.addField("p2_5", (int)sample.p2_5);
+  measurement.addField("p10_0", (int)sample.p10_0);
 
   if (aqi)
   {
@@ -542,15 +542,15 @@ void loop()
   // wait for a period before actually sampling it.
   _delay(SENSOR_STARTUP_DELAY);
 
-  int sample[3];
-  bool success = sample_sensor(sample);
+  AirData sample;
+  bool success = sample_sensor(&sample);
   if (success)
   {
-    Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n", sample[0], sample[1], sample[2]);
-    for (int i = 0; i < 3; i++)
-    {
-      last_values[i] = sample[i];
-    }
+    Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
+                  sample.p1_0,
+                  sample.p2_5,
+                  sample.p10_0);
+    last_values = sample;
     last_measured = millis();
     strcpy(last_status, "SUCCESS");
   }

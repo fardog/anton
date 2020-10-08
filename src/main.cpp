@@ -8,13 +8,14 @@
 #include <WiFiManager.h>
 #include <WiFiClient.h>
 
-#include <InfluxDbClient.h>
 #include <SoftwareSerial.h>
 #include <AQI.h>
 
 #include "strings.h"
 #include "sensors/AirSensor.h"
 #include "sensors/ZH03B_AirSensor.h"
+#include "reporters/Reporter.h"
+#include "reporters/InfluxDB_Reporter.h"
 
 #ifndef GIT_REV
 #define GIT_REV "Unknown"
@@ -49,8 +50,8 @@ static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const int MAX_CONNECTION_FAIL = 5;
 
 SoftwareSerial ZHSerial(D1, D2); // RX, TX
-InfluxDBClient InfluxDB;
 AirSensor *sensor;
+Reporter *reporter;
 
 // web server; we only start this once configured, otherwise we rely on the
 // configuration page that WiFiManager provides.
@@ -359,7 +360,12 @@ void setup()
   // start http server
   run_http_server();
 
-  InfluxDB.setConnectionParamsV1(influxdb_url, influxdb_database);
+  // set up reporter
+  InfluxDB_Reporter *DB = new InfluxDB_Reporter(sensor_name,
+                                                sensor_location,
+                                                influxdb_url,
+                                                influxdb_database);
+  reporter = DB;
 
   // set up ZH03B sensor
   ZHSerial.begin(9600);
@@ -422,73 +428,6 @@ bool sample_sensor(AirData *sample)
   sample->p10_0 = median_value(pm10_0, successes);
 
   return true;
-}
-
-struct CalculatedAQI
-{
-  float value;
-  char pollutant[5];
-};
-
-bool calculate_aqi(AirData sample, CalculatedAQI *aqi)
-{
-  AQI::Measurement list[2] = {
-      AQI::Measurement(AQI::PM2_5, sample.p2_5),
-      AQI::Measurement(AQI::PM10, sample.p10_0)};
-
-  AQI::Measurements measurements = AQI::Measurements(list, 2);
-
-  aqi->value = measurements.getAQI();
-  if (aqi->value == -1)
-  {
-    return false;
-  }
-
-  AQI::Pollutant pollutant = measurements.getPollutant();
-  switch (pollutant)
-  {
-  case AQI::PM2_5:
-    strcpy(aqi->pollutant, "p2_5");
-    break;
-  case AQI::PM10:
-    strcpy(aqi->pollutant, "p10_0");
-    break;
-  default:
-    return false;
-  }
-
-  return true;
-}
-
-bool post_measurement(AirData sample, CalculatedAQI *aqi)
-{
-  Point measurement("particulate_matter");
-  measurement.addTag("node", sensor_name);
-  if (strcmp(sensor_location, ""))
-  {
-    measurement.addTag("location", sensor_location);
-  }
-
-  measurement.addField("p1_0", (int)sample.p1_0);
-  measurement.addField("p2_5", (int)sample.p2_5);
-  measurement.addField("p10_0", (int)sample.p10_0);
-
-  if (aqi)
-  {
-    measurement.addField("aqi", (int)round(aqi->value));
-    measurement.addField("aqi_contributor", aqi->pollutant);
-  }
-
-  Serial.print("post_measurement: ");
-  Serial.println(measurement.toLineProtocol());
-
-  bool success = InfluxDB.writePoint(measurement);
-  if (!success)
-  {
-    Serial.println(InfluxDB.getLastErrorMessage());
-  }
-
-  return success;
 }
 
 void loop()
@@ -573,8 +512,8 @@ void loop()
   if (success)
   {
     CalculatedAQI aqi;
-    bool aqi_success = calculate_aqi(sample, &aqi);
-    if (post_measurement(sample, aqi_success ? &aqi : nullptr))
+    bool aqi_success = calculateAQI(sample, &aqi);
+    if (reporter->report(&sample, aqi_success ? &aqi : nullptr))
     {
       Serial.println("loop: sample submitted successfully");
     }

@@ -66,49 +66,5 @@ const char *resetPage = R"(
   </body>
 </html>
 )";
-const char *configPage = R"(
-<!DOCTYPE html>
-<html>
-  <body>
-    <a href="/">&lt; Back</a>
-    <h1>Configuration</h1>
-    <form method="POST" action="/config" enctype="multipart/form-data">
-      <h2>Sensor</h2>
-      <div>
-        <label>
-          Name
-          <input type="text" name="sensor_name" value="%s" placeholder="sensor name">
-        </label>
-      </div>
-      <div>
-        <label>
-          Location
-          <input type="text" name="sensor_location" value="%s" placeholder="sensor location">
-        </label>
-      </div>
-      <h2>InfluxDB Server</h2>
-      <div>
-        <label>
-          Hostname
-          <input type="text" name="influxdb_server" value="%s" placeholder="influxdb hostname">
-        </label>
-      </div>
-      <div>
-        <label>
-          Port
-          <input type="text" name="influxdb_port" value="%s" placeholder="influxdb port">
-        </label>
-      </div>
-      <div>
-        <label>
-          Database
-          <input type="text" name="influxdb_database" value="%s" placeholder="influxdb database">
-        </label>
-      </div>
-      <input type="submit" value="Save">
-    </form>
-  </body>
-</html>
-)";
 
 #endif

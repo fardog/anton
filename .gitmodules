@@ -7,3 +7,6 @@
 [submodule "lib/influxdb"]
 	path = lib/influxdb
 	url = git@github.com:tobiasschuerg/InfluxDB-Client-for-Arduino.git
+[submodule "lib/IotWebConf"]
+	path = lib/IotWebConf
+	url = git@github.com:prampec/IotWebConf.git

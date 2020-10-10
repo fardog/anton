@@ -1,25 +1,23 @@
 #include <Arduino.h>
-
-#include <ArduinoJson.h>
-
-#include <ESP8266WiFi.h>
-#include <DNSServer.h>
-#include <ESP8266WebServer.h>
-#include <WiFiManager.h>
-#include <WiFiClient.h>
-
 #include <SoftwareSerial.h>
+
 #include <AQI.h>
+#include <IotWebConf.h>
 
 #include "strings.h"
-#include "sensors/AirSensor.h"
-#include "sensors/ZH03B_AirSensor.h"
+
 #include "reporters/Reporter.h"
 #include "reporters/InfluxDB_Reporter.h"
+#include "sensors/AirSensor.h"
+#include "sensors/ZH03B_AirSensor.h"
 
 #ifndef GIT_REV
 #define GIT_REV "Unknown"
 #endif
+
+#define CONFIG_VERSION "v1"
+#define PRODUCT_NAME "anton"
+#define DEFAULT_PASSWORD "anton-system"
 
 char sensor_name[40] = "anton-default";
 char sensor_location[40] = "";
@@ -49,19 +47,44 @@ static const int MAX_JSON_DOCUMENT_SIZE = 2048;
 static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const int MAX_CONNECTION_FAIL = 5;
 
+// callback definitions
+void wifiConnected();
+
+DNSServer dnsServer;
+WebServer server(80);
+HTTPUpdateServer httpUpdater;
+
+IotWebConf iotWebConf(PRODUCT_NAME, &dnsServer, &server, DEFAULT_PASSWORD, CONFIG_VERSION);
+
+IotWebConfParameter sensorNameParam = IotWebConfParameter(
+    "Sensor Name",
+    "barton",
+    sensor_name,
+    40);
+IotWebConfParameter sensorLocationParam = IotWebConfParameter(
+    "Location",
+    "location",
+    sensor_location,
+    40);
+IotWebConfParameter influxDbServerParam = IotWebConfParameter(
+    "InfluxDB Server Host",
+    "influxDbHost",
+    influxdb_server,
+    100);
+IotWebConfParameter influxDbPortParam = IotWebConfParameter(
+    "InfluxDB Port",
+    "8086",
+    influxdb_port,
+    6);
+IotWebConfParameter influxDbDatabaseParam = IotWebConfParameter(
+    "InfluxDB Database",
+    "anton",
+    influxdb_database,
+    40);
+
 SoftwareSerial ZHSerial(D1, D2); // RX, TX
 AirSensor *sensor;
 Reporter *reporter;
-
-// web server; we only start this once configured, otherwise we rely on the
-// configuration page that WiFiManager provides.
-ESP8266WebServer server(80);
-
-void save_config_callback()
-{
-  Serial.println("config: should save config");
-  should_save_config = true;
-}
 
 void _delay(unsigned long ms)
 {
@@ -69,7 +92,7 @@ void _delay(unsigned long ms)
 
   while (1)
   {
-    server.handleClient();
+    iotWebConf.doLoop();
     delay(100);
     if (millis() - now > ms)
     {
@@ -83,86 +106,6 @@ void reset_all()
   WiFi.disconnect();
   SPIFFS.format();
   ESP.restart();
-}
-
-void read_config()
-{
-  Serial.println("config: mounting file system");
-
-  if (SPIFFS.begin())
-  {
-    Serial.println("config: file system mounted");
-    if (SPIFFS.exists("/config.json"))
-    {
-      Serial.println("config: file exists");
-
-      File configFile = SPIFFS.open("/config.json", "r");
-      if (configFile)
-      {
-        Serial.println("config: opened file");
-
-        DynamicJsonDocument doc(MAX_JSON_DOCUMENT_SIZE);
-
-        deserializeJson(doc, configFile);
-
-        if (!doc.isNull())
-        {
-          Serial.print("config: parsed json: ");
-          serializeJson(doc, Serial);
-          Serial.print("\n");
-
-          strcpy(sensor_name, doc["sensor_name"]);
-          strcpy(influxdb_server, doc["influxdb_server"]);
-          strcpy(influxdb_port, doc["influxdb_port"]);
-          strcpy(influxdb_database, doc["influxdb_database"]);
-
-          // values added after the initial firmware, may be unset
-          if (doc["sensor_location"])
-          {
-            strcpy(sensor_location, doc["sensor_location"]);
-          }
-
-          configured = true;
-        }
-        else
-        {
-          Serial.println("config: failed to load json");
-        }
-
-        configFile.close();
-      }
-    }
-  }
-  else
-  {
-    Serial.println("config: failed to mount file system");
-  }
-}
-
-void save_config()
-{
-  Serial.println("config: saving config");
-
-  DynamicJsonDocument doc(MAX_JSON_DOCUMENT_SIZE);
-
-  doc["sensor_name"] = sensor_name;
-  doc["sensor_location"] = sensor_location;
-  doc["influxdb_server"] = influxdb_server;
-  doc["influxdb_port"] = influxdb_port;
-  doc["influxdb_database"] = influxdb_database;
-
-  File configFile = SPIFFS.open("/config.json", "w");
-  if (!configFile)
-  {
-    Serial.println("config: failed to open file for writing");
-    return;
-  }
-
-  serializeJson(doc, configFile);
-  serializeJson(doc, Serial);
-
-  configFile.close();
-  configured = true;
 }
 
 void render_index_page(char *buf)
@@ -188,177 +131,44 @@ void render_index_page(char *buf)
       GIT_REV);
 }
 
-void render_config_page(char *buf)
+void handleRoot()
 {
-  sprintf(
-      buf,
-      configPage,
-      sensor_name,
-      sensor_location,
-      influxdb_server,
-      influxdb_port,
-      influxdb_database);
-}
+  // -- Let IotWebConf test and handle captive portal requests.
+  if (iotWebConf.handleCaptivePortal())
+  {
+    // -- Captive portal request were already served.
+    return;
+  }
 
-void run_http_server()
-{
-  server.on("/", HTTP_GET, []() {
-    Serial.println("http: serving index");
-    server.sendHeader("Connection", "close");
-    char buf[1024] = "";
-    render_index_page(buf);
-    server.send(200, "text/html", buf);
-  });
+  char buf[2048];
+  render_index_page(buf);
 
-  server.on("/config", HTTP_GET, []() {
-    Serial.println("http: serving config");
-    server.sendHeader("Connection", "close");
-    char buf[2048] = "";
-    render_config_page(buf);
-    server.send(200, "text/html", buf);
-  });
-
-  server.on("/config", HTTP_POST, []() {
-    Serial.println("http: saving config");
-
-    if (server.hasArg("sensor_name"))
-    {
-      strcpy(sensor_name, server.arg("sensor_name").c_str());
-    }
-    if (server.hasArg("sensor_location"))
-    {
-      strcpy(sensor_location, server.arg("sensor_location").c_str());
-    }
-    if (server.hasArg("influxdb_server"))
-    {
-      strcpy(influxdb_server, server.arg("influxdb_server").c_str());
-    }
-    if (server.hasArg("influxdb_port"))
-    {
-      strcpy(influxdb_port, server.arg("influxdb_port").c_str());
-    }
-    if (server.hasArg("influxdb_database"))
-    {
-      strcpy(influxdb_database, server.arg("influxdb_database").c_str());
-    }
-
-    save_config();
-    Serial.println("http: config saved, restarting");
-
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", "saved, restarting");
-    delay(100);
-    ESP.restart();
-  });
-
-  server.on("/reset", HTTP_GET, []() {
-    Serial.println("http: serving reset");
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/html", resetPage);
-  });
-
-  server.on("/reboot", HTTP_POST, []() {
-    Serial.println("http: serving reboot");
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", "rebooting");
-    ESP.restart();
-  });
-
-  server.on("/reset-confirm", HTTP_POST, []() {
-    Serial.println("http: serving reset confirm");
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", "resetting");
-    reset_all();
-  });
-
-  server.on(
-      "/update",
-      HTTP_POST,
-      []() {
-        server.sendHeader("Connection", "close");
-        server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-        ESP.restart();
-      },
-      []() {
-        HTTPUpload &upload = server.upload();
-        if (upload.status == UPLOAD_FILE_START)
-        {
-          Serial.setDebugOutput(true);
-          WiFiUDP::stopAll();
-          Serial.printf("Update: %s\n", upload.filename.c_str());
-          uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-          if (!Update.begin(maxSketchSpace))
-          { //start with max available size
-            Update.printError(Serial);
-          }
-        }
-        else if (upload.status == UPLOAD_FILE_WRITE)
-        {
-          if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
-          {
-            Update.printError(Serial);
-          }
-        }
-        else if (upload.status == UPLOAD_FILE_END)
-        {
-          if (Update.end(true))
-          { //true to set the size to the current progress
-            Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-          }
-          else
-          {
-            Update.printError(Serial);
-          }
-          Serial.setDebugOutput(false);
-        }
-        yield();
-      });
-
-  Serial.println("http: running server");
-  server.begin();
+  server.send(200, "text/html", buf);
 }
 
 void setup()
 {
   Serial.begin(9600);
   Serial.printf("setup: starting version %s\n", GIT_REV);
-  WiFiManager wifiManager;
-  wifiManager.setSaveConfigCallback(save_config_callback);
 
-  read_config();
+  iotWebConf.addParameter(&sensorNameParam);
+  iotWebConf.addParameter(&sensorLocationParam);
+  iotWebConf.addParameter(&influxDbServerParam);
+  iotWebConf.addParameter(&influxDbPortParam);
+  iotWebConf.addParameter(&influxDbDatabaseParam);
 
-  WiFiManagerParameter sensor_name_param("sensor_name", "sensor name", sensor_name, 40);
-  wifiManager.addParameter(&sensor_name_param);
-  WiFiManagerParameter sensor_location_param("sensor_location", "sensor location", sensor_location, 40);
-  wifiManager.addParameter(&sensor_location_param);
-  WiFiManagerParameter influxdb_server_param("influxdb_server", "influxdb server", influxdb_server, 100);
-  wifiManager.addParameter(&influxdb_server_param);
-  WiFiManagerParameter influxdb_port_param("influxdb_port", "influxdb port", influxdb_port, 6);
-  wifiManager.addParameter(&influxdb_port_param);
-  WiFiManagerParameter influxdb_database_param("influxdb_database", "influxdb database", influxdb_database, 40);
-  wifiManager.addParameter(&influxdb_database_param);
+  iotWebConf.setWifiConnectionCallback(&wifiConnected);
+  iotWebConf.getApTimeoutParameter()->visible = true;
+  iotWebConf.setupUpdateServer(&httpUpdater);
 
-  wifiManager.autoConnect("anton-setup");
-  Serial.println("setup: wifi connected");
+  iotWebConf.init();
 
-  //read updated parameters
-  strcpy(sensor_name, sensor_name_param.getValue());
-  strcpy(sensor_location, sensor_location_param.getValue());
-  strcpy(influxdb_server, influxdb_server_param.getValue());
-  strcpy(influxdb_port, influxdb_port_param.getValue());
-  strcpy(influxdb_database, influxdb_database_param.getValue());
+  server.on("/", handleRoot);
+  server.on("/config", [] { iotWebConf.handleConfig(); });
+  server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
-  // create influxdb url
   sprintf(influxdb_url, "http://%s:%s", influxdb_server, influxdb_port);
   Serial.printf("setup: influxdb url: %s\n", influxdb_url);
-
-  if (should_save_config)
-  {
-    save_config();
-  }
-
-  // start http server
-  run_http_server();
 
   // set up reporter
   InfluxDB_Reporter *DB = new InfluxDB_Reporter(sensor_name,
@@ -371,6 +181,11 @@ void setup()
   ZHSerial.begin(9600);
   ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
   sensor = ZH;
+}
+
+void wifiConnected()
+{
+  configured = true;
 }
 
 int sort_uint16_desc(const void *cmp1, const void *cmp2)
@@ -434,9 +249,7 @@ void loop()
 {
   if (!configured)
   {
-    Serial.println("loop: unconfigured, resetting");
-    reset_all();
-    delay(5000);
+    iotWebConf.doLoop();
     return;
   }
 

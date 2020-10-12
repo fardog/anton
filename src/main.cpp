@@ -140,6 +140,13 @@ void handleRoot()
     return;
   }
 
+  if (!configured)
+  {
+    server.sendHeader("Location", String("/config"), true);
+    server.send(302, "text/plain", "");
+    return;
+  }
+
   char buf[2048];
   render_index_page(buf);
 

@@ -171,6 +171,25 @@ void setup()
   iotWebConf.init();
 
   server.on("/", handleRoot);
+
+  server.on("/reset", HTTP_GET, []() {
+    Serial.println("http: serving reset");
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", resetPage);
+  });
+  server.on("/reboot", HTTP_POST, []() {
+    Serial.println("http: serving reboot");
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", "rebooting");
+    ESP.restart();
+  });
+  server.on("/reset-confirm", HTTP_POST, []() {
+    Serial.println("http: serving reset confirm");
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", "resetting");
+    reset_all();
+  });
+
   server.on("/config", [] { iotWebConf.handleConfig(); });
   server.onNotFound([]() { iotWebConf.handleNotFound(); });
 

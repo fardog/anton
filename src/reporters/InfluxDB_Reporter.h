@@ -14,7 +14,7 @@ public:
                       const char *serverUrl,
                       const char *db,
                       bool debug = false);
-    bool report(AirData *air, CalculatedAQI *aqi);
+    bool report(AirData *air, CalculatedAQI *aqi, EnvironmentData *env);
     String getLastErrorMessage();
 
 private:

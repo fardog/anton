@@ -16,6 +16,8 @@
 #include "sensors/ZH03B_AirSensor.h"
 #include "reporters/Reporter.h"
 #include "reporters/InfluxDB_Reporter.h"
+#include "sensors/EnvironmentSensor.h"
+#include "sensors/BME680_EnvironmentSensor.h"
 
 #ifndef GIT_REV
 #define GIT_REV "Unknown"
@@ -49,9 +51,10 @@ static const int MAX_JSON_DOCUMENT_SIZE = 2048;
 static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const int MAX_CONNECTION_FAIL = 5;
 
-SoftwareSerial ZHSerial(D1, D2); // RX, TX
+SoftwareSerial ZHSerial(D3, D4); // RX, TX
 AirSensor *sensor;
 Reporter *reporter;
+EnvironmentSensor *environment;
 
 // web server; we only start this once configured, otherwise we rely on the
 // configuration page that WiFiManager provides.
@@ -371,6 +374,9 @@ void setup()
   ZHSerial.begin(9600);
   ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
   sensor = ZH;
+
+  BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor();
+  environment = BME;
 }
 
 int sort_uint16_desc(const void *cmp1, const void *cmp2)
@@ -430,6 +436,24 @@ bool sample_sensor(AirData *sample)
   return true;
 }
 
+float altitude(const int32_t press, const float seaLevel = 1013.25);
+float altitude(const int32_t press, const float seaLevel)
+{
+  /*!
+  @brief     This converts a pressure measurement into a height in meters
+  @details   The corrected sea-level pressure can be passed into the function if it is known,
+             otherwise the standard atmospheric pressure of 1013.25hPa is used (see
+             https://en.wikipedia.org/wiki/Atmospheric_pressure) for details.
+  @param[in] press    Pressure reading from BME680
+  @param[in] seaLevel Sea-Level pressure in millibars
+  @return    floating point altitude in meters.
+  */
+  static float Altitude;
+  Altitude =
+      44330.0 * (1.0 - pow(((float)press / 100.0) / seaLevel, 0.1903)); // Convert into meters
+  return (Altitude);
+} // of method altitude()
+
 void loop()
 {
   if (!configured)
@@ -481,6 +505,9 @@ void loop()
   // wait for a period before actually sampling it.
   _delay(SENSOR_STARTUP_DELAY);
 
+  EnvironmentData envSample;
+  bool envSuccess = environment->getEnvironmentData(&envSample);
+
   AirData sample;
   bool success = sample_sensor(&sample);
   if (success)
@@ -509,11 +536,11 @@ void loop()
     Serial.println("loop: ERROR failed to sleep the sensor");
   }
 
-  if (success)
+  if (success && false)
   {
     CalculatedAQI aqi;
     bool aqi_success = calculateAQI(sample, &aqi);
-    if (reporter->report(&sample, aqi_success ? &aqi : nullptr))
+    if (reporter->report(&sample, aqi_success ? &aqi : nullptr, envSuccess ? &envSample : nullptr))
     {
       Serial.println("loop: sample submitted successfully");
     }
@@ -534,5 +561,5 @@ void loop()
     }
   }
 
-  _delay(MEASUREMENT_DELAY);
+  _delay(5000);
 }

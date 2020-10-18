@@ -25,8 +25,8 @@ Wire the sensor as follows:
 
 * Pin1: `VU`
 * Pin2: `Ground`
-* Pin4: `D1`
-* Pin5: `D2`
+* Pin4: `D3`
+* Pin5: `D4`
 
 A 3D printable case for Anton is available at [PrusaPrinters][].
 

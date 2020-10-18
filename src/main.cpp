@@ -375,7 +375,7 @@ void setup()
   ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
   sensor = ZH;
 
-  BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor();
+  BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
   environment = BME;
 }
 

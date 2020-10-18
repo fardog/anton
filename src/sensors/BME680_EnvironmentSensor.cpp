@@ -1,13 +1,16 @@
 #include "BME680_EnvironmentSensor.h"
 
-BME680_EnvironmentSensor::BME680_EnvironmentSensor() : _sensor(BME680_Class())
+BME680_EnvironmentSensor::BME680_EnvironmentSensor(uint16_t gasTemp, uint16_t gasMillis)
+    : _sensor(BME680_Class()),
+      _gasTemp(gasTemp),
+      _gasMillis(gasMillis)
 {
     _sensor.begin(I2C_STANDARD_MODE);
     _sensor.setOversampling(TemperatureSensor, Oversample16); // Use enumerated type values
     _sensor.setOversampling(HumiditySensor, Oversample16);    // Use enumerated type values
     _sensor.setOversampling(PressureSensor, Oversample16);    // Use enumerated type values
     _sensor.setIIRFilter(IIR4);                               // Use enumerated type values
-    _sensor.setGas(320, 150);                                 // 320°c for 150 milliseconds
+    _sensor.setGas(_gasTemp, _gasMillis);                     // 320°c for 150 milliseconds
 }
 
 bool BME680_EnvironmentSensor::getEnvironmentData(EnvironmentData *data)

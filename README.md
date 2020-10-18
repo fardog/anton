@@ -16,17 +16,25 @@ Hardware:
 
 * NodeMCUv3 or similar ESP8266-based system
 * ZH03B particulate matter sensor
+* BME680 sensor and breakout board; configured for i2c
 
 Software:
 
 * InfluxDB v1.8
 
-Wire the sensor as follows:
+Wire the ZH03B as follows:
 
 * Pin1: `VU`
 * Pin2: `Ground`
 * Pin4: `D3`
 * Pin5: `D4`
+
+Wire the BME680 as follows:
+
+* VCC: `3v3`
+* GND: `Ground`
+* SCL: `D1`
+* SDA: `D2`
 
 A 3D printable case for Anton is available at [PrusaPrinters][].
 

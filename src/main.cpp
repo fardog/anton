@@ -436,24 +436,6 @@ bool sample_sensor(AirData *sample)
   return true;
 }
 
-float altitude(const int32_t press, const float seaLevel = 1013.25);
-float altitude(const int32_t press, const float seaLevel)
-{
-  /*!
-  @brief     This converts a pressure measurement into a height in meters
-  @details   The corrected sea-level pressure can be passed into the function if it is known,
-             otherwise the standard atmospheric pressure of 1013.25hPa is used (see
-             https://en.wikipedia.org/wiki/Atmospheric_pressure) for details.
-  @param[in] press    Pressure reading from BME680
-  @param[in] seaLevel Sea-Level pressure in millibars
-  @return    floating point altitude in meters.
-  */
-  static float Altitude;
-  Altitude =
-      44330.0 * (1.0 - pow(((float)press / 100.0) / seaLevel, 0.1903)); // Convert into meters
-  return (Altitude);
-} // of method altitude()
-
 void loop()
 {
   if (!configured)

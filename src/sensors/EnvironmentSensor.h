@@ -7,7 +7,10 @@ struct EnvironmentData
     float humPct;
     float pressure;
     float gasResistance;
+    float iaq;
 };
+
+float calculateIAQ(float gasResistance, float humPct);
 
 class EnvironmentSensor
 {

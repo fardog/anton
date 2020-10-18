@@ -1,5 +1,10 @@
 #include "InfluxDB_Reporter.h"
 
+int rnd(float val)
+{
+    return (int)round(val);
+}
+
 InfluxDB_Reporter::InfluxDB_Reporter(const char *sensorName,
                                      const char *sensorLocation,
                                      const char *serverUrl,
@@ -27,16 +32,17 @@ bool InfluxDB_Reporter::report(AirData *air, CalculatedAQI *aqi, EnvironmentData
 
     if (aqi)
     {
-        measurement.addField("aqi", (int)round(aqi->value));
+        measurement.addField("aqi", rnd(aqi->value));
         measurement.addField("aqi_contributor", aqi->pollutant);
     }
 
     if (env)
     {
-        measurement.addField("temperature", env->tempC);
-        measurement.addField("humidity", env->humPct);
-        measurement.addField("pressure", env->pressure);
-        measurement.addField("gas_resistance", env->gasResistance);
+        measurement.addField("temperature", rnd(env->tempC));
+        measurement.addField("humidity", rnd(env->humPct));
+        measurement.addField("pressure", rnd(env->pressure));
+        measurement.addField("gas_resistance", rnd(env->gasResistance));
+        measurement.addField("iaq", rnd(env->iaq));
     }
 
     Serial.print("post_measurement: ");

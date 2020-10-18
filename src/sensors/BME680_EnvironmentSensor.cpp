@@ -26,6 +26,7 @@ bool BME680_EnvironmentSensor::getEnvironmentData(EnvironmentData *data)
     data->humPct = (float)hum / 1000;
     data->pressure = (float)pressure / 100;
     data->gasResistance = (float)gas / 100;
+    data->iaq = calculateIAQ(data->gasResistance, data->humPct);
 
     return true;
 }

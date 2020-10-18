@@ -536,7 +536,7 @@ void loop()
     Serial.println("loop: ERROR failed to sleep the sensor");
   }
 
-  if (success && false)
+  if (success)
   {
     CalculatedAQI aqi;
     bool aqi_success = calculateAQI(sample, &aqi);
@@ -561,5 +561,5 @@ void loop()
     }
   }
 
-  _delay(5000);
+  _delay(MEASUREMENT_DELAY);
 }

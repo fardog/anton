@@ -8,13 +8,13 @@ const char *serverIndex = R"(
     <h1>Measurements</h1>
     Measured %d seconds ago; last result was %s.
     <dl>
-      <dt>PM1.0</dt>
+      <dt>Temperature</dt>
       <dd>%d</dd>
 
-      <dt>PM2.5</dt>
+      <dt>Humidity</dt>
       <dd>%d</dd>
 
-      <dt>PM10</dt>
+      <dt>IAQ</dt>
       <dd>%d</dd>
 
       <dt>AQI</dt>

@@ -7,3 +7,6 @@
 [submodule "lib/influxdb"]
 	path = lib/influxdb
 	url = git@github.com:tobiasschuerg/InfluxDB-Client-for-Arduino.git
+[submodule "lib/BME680"]
+	path = lib/BME680
+	url = git@github.com:SV-Zanshin/BME680.git

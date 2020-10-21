@@ -6,7 +6,6 @@ Submits data directly to an [InfluxDB][] v1 instance, without auth.
 I built this because the west coast is on fire, and I ran out of [Luftdaten][]
 sensor parts. It's not pretty or full featured but it works.
 
-[ZH03B]: https://www.winsen-sensor.com/sensors/dust-sensor/zh3b.html
 [InfluxDB]: https://docs.influxdata.com/influxdb/v1.8/
 [Luftdaten]: https://sensor.community/
 
@@ -15,8 +14,11 @@ sensor parts. It's not pretty or full featured but it works.
 Hardware:
 
 * NodeMCUv3 or similar ESP8266-based system
-* ZH03B particulate matter sensor
-* BME680 sensor and breakout board; configured for i2c
+* [ZH03B][] particulate matter sensor
+* [BME680][] sensor and breakout board; configured for i2c
+
+[ZH03B]: https://www.winsen-sensor.com/sensors/dust-sensor/zh3b.html
+[BME680]: https://www.bosch-sensortec.com/products/environmental-sensors/gas-sensors-bme680/
 
 Software:
 

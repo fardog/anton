@@ -18,6 +18,7 @@
 #include "reporters/InfluxDB_Reporter.h"
 #include "sensors/EnvironmentSensor.h"
 #include "sensors/BME680_EnvironmentSensor.h"
+#include "util.h"
 
 #ifndef GIT_REV
 #define GIT_REV "Unknown"
@@ -38,6 +39,7 @@ int wakeup_fail_counter = 0;
 int connection_fail_counter = 0;
 int last_measured = 0;
 AirData last_values;
+EnvironmentData last_env;
 char last_status[10] = "NONE";
 int last_aqi = 0;
 char last_primary_contributor[5] = "NONE";
@@ -180,9 +182,9 @@ void render_index_page(char *buf)
       serverIndex,
       last,
       last_status,
-      last_values.p1_0,
-      last_values.p2_5,
-      last_values.p10_0,
+      util::rnd(last_env.tempC),
+      util::rnd(last_env.humPct),
+      util::rnd(last_env.iaq),
       last_aqi,
       last_primary_contributor,
       millis() / 1000,
@@ -489,6 +491,10 @@ void loop()
 
   EnvironmentData envSample;
   bool envSuccess = environment->getEnvironmentData(&envSample);
+  if (envSuccess)
+  {
+    last_env = envSample;
+  }
 
   AirData sample;
   bool success = sample_sensor(&sample);

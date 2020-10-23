@@ -18,9 +18,9 @@ public:
     String getLastErrorMessage();
 
 private:
+    InfluxDBClient _client;
     const char *_sensorName;
     const char *_sensorLocation;
-    InfluxDBClient _client;
     bool _debug;
 };
 

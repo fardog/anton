@@ -408,7 +408,7 @@ bool sample_sensor(AirData *sample)
   {
     if (sensor->getAirData(&buf))
     {
-      if (buf.p1_0 == buf.p2_5 == buf.p10_0 && buf.p1_0 > 500)
+      if (buf.p1_0 == buf.p2_5 && buf.p2_5 == buf.p10_0 && buf.p1_0 > 500)
       {
         Serial.println("sensor: faulty measurement, all values are equal and very large. discarding");
       }

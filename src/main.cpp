@@ -7,6 +7,7 @@
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>
 #include <WiFiClient.h>
+#include <LittleFS.h>
 
 #include <SoftwareSerial.h>
 #include <AQI.h>
@@ -86,7 +87,7 @@ void _delay(unsigned long ms)
 void reset_all()
 {
   WiFi.disconnect();
-  SPIFFS.format();
+  LittleFS.format();
   ESP.restart();
 }
 
@@ -94,14 +95,14 @@ void read_config()
 {
   Serial.println("config: mounting file system");
 
-  if (SPIFFS.begin())
+  if (LittleFS.begin())
   {
     Serial.println("config: file system mounted");
-    if (SPIFFS.exists("/config.json"))
+    if (LittleFS.exists("/config.json"))
     {
       Serial.println("config: file exists");
 
-      File configFile = SPIFFS.open("/config.json", "r");
+      File configFile = LittleFS.open("/config.json", "r");
       if (configFile)
       {
         Serial.println("config: opened file");
@@ -156,7 +157,7 @@ void save_config()
   doc["influxdb_port"] = influxdb_port;
   doc["influxdb_database"] = influxdb_database;
 
-  File configFile = SPIFFS.open("/config.json", "w");
+  File configFile = LittleFS.open("/config.json", "w");
   if (!configFile)
   {
     Serial.println("config: failed to open file for writing");

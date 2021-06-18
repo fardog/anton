@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <LittleFS.h>
 #include <SoftwareSerial.h>
 
 #include <AQI.h>
@@ -10,6 +11,9 @@
 #include "reporters/InfluxDB_Reporter.h"
 #include "sensors/AirSensor.h"
 #include "sensors/ZH03B_AirSensor.h"
+#include "sensors/EnvironmentSensor.h"
+#include "sensors/BME680_EnvironmentSensor.h"
+#include "util.h"
 
 #ifndef GIT_REV
 #define GIT_REV "Unknown"
@@ -34,6 +38,7 @@ int wakeup_fail_counter = 0;
 int connection_fail_counter = 0;
 int last_measured = 0;
 AirData last_values;
+EnvironmentData last_env;
 char last_status[10] = "NONE";
 int last_aqi = 0;
 char last_primary_contributor[5] = "NONE";
@@ -82,9 +87,10 @@ IotWebConfParameter influxDbDatabaseParam = IotWebConfParameter(
     influxdb_database,
     40);
 
-SoftwareSerial ZHSerial(D1, D2); // RX, TX
+SoftwareSerial ZHSerial(D3, D4); // RX, TX
 AirSensor *sensor;
 Reporter *reporter;
+EnvironmentSensor *environment;
 
 void _delay(unsigned long ms)
 {
@@ -104,7 +110,7 @@ void _delay(unsigned long ms)
 void reset_all()
 {
   WiFi.disconnect();
-  SPIFFS.format();
+  LittleFS.format();
   ESP.restart();
 }
 
@@ -120,9 +126,9 @@ void render_index_page(char *buf)
       serverIndex,
       last,
       last_status,
-      last_values.p1_0,
-      last_values.p2_5,
-      last_values.p10_0,
+      util::rnd(last_env.tempC),
+      util::rnd(last_env.humPct),
+      util::rnd(last_env.iaq),
       last_aqi,
       last_primary_contributor,
       millis() / 1000,
@@ -207,6 +213,9 @@ void setup()
   ZHSerial.begin(9600);
   ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
   sensor = ZH;
+
+  BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
+  environment = BME;
 }
 
 void wifiConnected()
@@ -241,7 +250,7 @@ bool sample_sensor(AirData *sample)
   {
     if (sensor->getAirData(&buf))
     {
-      if (buf.p1_0 == buf.p2_5 == buf.p10_0 && buf.p1_0 > 500)
+      if (buf.p1_0 == buf.p2_5 && buf.p2_5 == buf.p10_0 && buf.p1_0 > 500)
       {
         Serial.println("sensor: faulty measurement, all values are equal and very large. discarding");
       }
@@ -320,6 +329,13 @@ void loop()
   // wait for a period before actually sampling it.
   _delay(SENSOR_STARTUP_DELAY);
 
+  EnvironmentData envSample;
+  bool envSuccess = environment->getEnvironmentData(&envSample);
+  if (envSuccess)
+  {
+    last_env = envSample;
+  }
+
   AirData sample;
   bool success = sample_sensor(&sample);
   if (success)
@@ -352,7 +368,7 @@ void loop()
   {
     CalculatedAQI aqi;
     bool aqi_success = calculateAQI(sample, &aqi);
-    if (reporter->report(&sample, aqi_success ? &aqi : nullptr))
+    if (reporter->report(&sample, aqi_success ? &aqi : nullptr, envSuccess ? &envSample : nullptr))
     {
       Serial.println("loop: sample submitted successfully");
     }

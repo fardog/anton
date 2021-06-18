@@ -6,7 +6,6 @@ Submits data directly to an [InfluxDB][] v1 instance, without auth.
 I built this because the west coast is on fire, and I ran out of [Luftdaten][]
 sensor parts. It's not pretty or full featured but it works.
 
-[ZH03B]: https://www.winsen-sensor.com/sensors/dust-sensor/zh3b.html
 [InfluxDB]: https://docs.influxdata.com/influxdb/v1.8/
 [Luftdaten]: https://sensor.community/
 
@@ -15,18 +14,29 @@ sensor parts. It's not pretty or full featured but it works.
 Hardware:
 
 * NodeMCUv3 or similar ESP8266-based system
-* ZH03B particulate matter sensor
+* [ZH03B][] particulate matter sensor
+* [BME680][] sensor and breakout board; configured for i2c
+
+[ZH03B]: https://www.winsen-sensor.com/sensors/dust-sensor/zh3b.html
+[BME680]: https://www.bosch-sensortec.com/products/environmental-sensors/gas-sensors-bme680/
 
 Software:
 
 * InfluxDB v1.8
 
-Wire the sensor as follows:
+Wire the ZH03B as follows:
 
 * Pin1: `VU`
 * Pin2: `Ground`
-* Pin4: `D1`
-* Pin5: `D2`
+* Pin4: `D3`
+* Pin5: `D4`
+
+Wire the BME680 as follows:
+
+* VCC: `3v3`
+* GND: `Ground`
+* SCL: `D1`
+* SDA: `D2`
 
 A 3D printable case for Anton is available at [PrusaPrinters][].
 
@@ -76,9 +86,19 @@ Once configured, a webserver is exposed on port 80 which can be used to view
 sensor values, update firmware, change configuration, and reboot or reset the
 sensor.
 
-**Note:** earlier versions of Anton submitted values to InfluxDB as floats; this
-has been corrected to use integer values. Updating will require you to either
-use a new database or rewrite your existing one.
+## Changelog
+
+Changes which are not backwards compatible will be listed here. Anton is under
+active development and does not have a fixed feature set, nor does it have
+version numbers yet. For now, changes will be listed by date.
+
+* **2020-10-22** Moved from the deprecated `SPIFFS` to the still-maintained
+  `LittleFS`. *This is a backwards incompatible change.* You will need to
+  reconfigure the sensor after upgrading.
+
+* **2020-10-03** earlier versions of Anton submitted values to InfluxDB as
+  floats; this has been corrected to use integer values. Updating will require
+  you to either use a new database or rewrite your existing one.
 
 ## Acknowledgements
 

@@ -1,4 +1,5 @@
 #include "InfluxDB_Reporter.h"
+#include "util.h"
 
 InfluxDB_Reporter::InfluxDB_Reporter(const char *sensorName,
                                      const char *sensorLocation,
@@ -12,7 +13,7 @@ InfluxDB_Reporter::InfluxDB_Reporter(const char *sensorName,
 {
 }
 
-bool InfluxDB_Reporter::report(AirData *air, CalculatedAQI *aqi)
+bool InfluxDB_Reporter::report(AirData *air, CalculatedAQI *aqi, EnvironmentData *env)
 {
     Point measurement("particulate_matter");
     measurement.addTag("node", _sensorName);
@@ -27,8 +28,17 @@ bool InfluxDB_Reporter::report(AirData *air, CalculatedAQI *aqi)
 
     if (aqi)
     {
-        measurement.addField("aqi", (int)round(aqi->value));
+        measurement.addField("aqi", util::rnd(aqi->value));
         measurement.addField("aqi_contributor", aqi->pollutant);
+    }
+
+    if (env)
+    {
+        measurement.addField("temperature", util::rnd(env->tempC));
+        measurement.addField("humidity", util::rnd(env->humPct));
+        measurement.addField("pressure", util::rnd(env->pressure));
+        measurement.addField("gas_resistance", util::rnd(env->gasResistance));
+        measurement.addField("iaq", util::rnd(env->iaq));
     }
 
     Serial.print("post_measurement: ");

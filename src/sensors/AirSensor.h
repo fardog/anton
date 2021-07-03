@@ -13,7 +13,7 @@ struct AirData
 struct CalculatedAQI
 {
     float value;
-    char pollutant[5];
+    char pollutant[6];
 };
 
 bool calculateAQI(AirData sample, CalculatedAQI *aqi);

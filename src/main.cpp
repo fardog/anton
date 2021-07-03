@@ -255,14 +255,14 @@ bool sample_sensor(AirData *sample)
   {
     Serial.printf("loop: ERROR failed to wake sensor %d times; resetting", wakeup_fail_counter);
     ESP.restart();
-    return;
+    return false;
   }
   else
   {
     Serial.println("loop: ERROR failed to wake the sensor; delaying and trying again");
     wakeup_fail_counter += 1;
     _delay(30000);
-    return;
+    return false;
   }
 
   // delay after sensor start; waking the sensor starts its fan, and we want to

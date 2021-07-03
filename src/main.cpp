@@ -28,6 +28,8 @@ char sensor_location[40] = "";
 char influxdb_server[100] = "influxdb";
 char influxdb_port[6] = "8086";
 char influxdb_database[40] = "anton";
+bool zh03b_enabled = true;
+bool bme680_enabled = true;
 
 char influxdb_url[200] = "";
 
@@ -88,8 +90,8 @@ IotWebConfParameter influxDbDatabaseParam = IotWebConfParameter(
     40);
 
 SoftwareSerial ZHSerial(D3, D4); // RX, TX
-AirSensor *sensor;
-Reporter *reporter;
+AirSensor *sensor = nullptr;
+Reporter *reporter = nullptr;
 EnvironmentSensor *environment;
 
 void _delay(unsigned long ms)
@@ -209,13 +211,17 @@ void setup()
                                                 influxdb_database);
   reporter = DB;
 
-  // set up ZH03B sensor
-  ZHSerial.begin(9600);
-  ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
-  sensor = ZH;
+  if (zh03b_enabled) {
+    // set up ZH03B sensor
+    ZHSerial.begin(9600);
+    ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
+    sensor = ZH;
+  }
 
-  BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
-  environment = BME;
+  if (bme680_enabled) {
+    BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
+    environment = BME;
+  }
 }
 
 void wifiConnected()
@@ -239,6 +245,30 @@ uint16_t median_value(uint16_t *values, int count)
 
 bool sample_sensor(AirData *sample)
 {
+  // wake sensor
+  if (sensor->wake())
+  {
+    Serial.println("loop: sensor wakeup successfully");
+    wakeup_fail_counter = 0;
+  }
+  else if (wakeup_fail_counter >= MAX_SENSOR_WAKE_FAIL)
+  {
+    Serial.printf("loop: ERROR failed to wake sensor %d times; resetting", wakeup_fail_counter);
+    ESP.restart();
+    return;
+  }
+  else
+  {
+    Serial.println("loop: ERROR failed to wake the sensor; delaying and trying again");
+    wakeup_fail_counter += 1;
+    _delay(30000);
+    return;
+  }
+
+  // delay after sensor start; waking the sensor starts its fan, and we want to
+  // wait for a period before actually sampling it.
+  _delay(SENSOR_STARTUP_DELAY);
+
   Serial.println("sensor: attemping average sample");
   uint16_t pm1_0[NUM_SAMPLES];
   uint16_t pm2_5[NUM_SAMPLES];
@@ -265,6 +295,16 @@ bool sample_sensor(AirData *sample)
       }
     }
     _delay(SAMPLE_DELAY);
+  }
+
+  // shut down sensor, stopping its fan.
+  if (sensor->sleep())
+  {
+    Serial.println("loop: sensor sleep successful");
+  }
+  else
+  {
+    Serial.println("loop: ERROR failed to sleep the sensor");
   }
 
   if (successes < MIN_SAMPLES_FOR_SUCCESS)
@@ -305,88 +345,62 @@ void loop()
     connection_fail_counter = 0;
   }
 
-  // wake sensor
-  if (sensor->wake())
-  {
-    Serial.println("loop: sensor wakeup successfully");
-    wakeup_fail_counter = 0;
-  }
-  else if (wakeup_fail_counter >= MAX_SENSOR_WAKE_FAIL)
-  {
-    Serial.printf("loop: ERROR failed to wake sensor %d times; resetting", wakeup_fail_counter);
-    ESP.restart();
-    return;
-  }
-  else
-  {
-    Serial.println("loop: ERROR failed to wake the sensor; delaying and trying again");
-    wakeup_fail_counter += 1;
-    _delay(30000);
-    return;
-  }
-
-  // delay after sensor start; waking the sensor starts its fan, and we want to
-  // wait for a period before actually sampling it.
-  _delay(SENSOR_STARTUP_DELAY);
-
   EnvironmentData envSample;
-  bool envSuccess = environment->getEnvironmentData(&envSample);
-  if (envSuccess)
-  {
-    last_env = envSample;
+  bool envSuccess = false;
+  if (environment) {
+    envSuccess = environment->getEnvironmentData(&envSample);
+    if (envSuccess)
+    {
+      last_env = envSample;
+    }
   }
 
   AirData sample;
-  bool success = sample_sensor(&sample);
-  if (success)
-  {
-    Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
-                  sample.p1_0,
-                  sample.p2_5,
-                  sample.p10_0);
-    last_values = sample;
-    last_measured = millis();
-    strcpy(last_status, "SUCCESS");
-  }
-  else
-  {
-    Serial.println("loop: failed to sample sensor");
-    strcpy(last_status, "FAILURE");
-  }
-
-  // shut down sensor, stopping its fan.
-  if (sensor->sleep())
-  {
-    Serial.println("loop: sensor sleep successful");
-  }
-  else
-  {
-    Serial.println("loop: ERROR failed to sleep the sensor");
-  }
-
-  if (success)
-  {
-    CalculatedAQI aqi;
-    bool aqi_success = calculateAQI(sample, &aqi);
-    if (reporter->report(&sample, aqi_success ? &aqi : nullptr, envSuccess ? &envSample : nullptr))
+  bool success = false;
+  if (sensor) {
+    success = sample_sensor(&sample);
+    if (success)
     {
-      Serial.println("loop: sample submitted successfully");
+      Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
+                    sample.p1_0,
+                    sample.p2_5,
+                    sample.p10_0);
+      last_values = sample;
+      last_measured = millis();
+      strcpy(last_status, "SUCCESS");
     }
     else
     {
-      Serial.println("loop: failed to submit sample");
+      Serial.println("loop: failed to sample sensor");
+      strcpy(last_status, "FAILURE");
     }
+  }
 
-    if (aqi_success)
-    {
-      last_aqi = aqi.value;
-      strcpy(last_primary_contributor, aqi.pollutant);
-    }
-    else
-    {
-      last_aqi = -1;
-      strcpy(last_primary_contributor, "NONE");
-    }
+  CalculatedAQI aqi;
+  bool aqi_success = false;
+
+  if (success) {
+    aqi_success = calculateAQI(sample, &aqi);
+  }
+
+  if (reporter->report(success ? &sample : nullptr, aqi_success ? &aqi : nullptr, envSuccess ? &envSample : nullptr))
+  {
+    Serial.println("loop: sample submitted successfully");
+  }
+  else
+  {
+    Serial.println("loop: failed to submit sample");
+  }
+
+  if (aqi_success)
+  {
+    last_aqi = aqi.value;
+    strcpy(last_primary_contributor, aqi.pollutant);
+  }
+  else
+  {
+    last_aqi = -1;
+    strcpy(last_primary_contributor, "NONE");
   }
 
   _delay(MEASUREMENT_DELAY);

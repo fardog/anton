@@ -22,9 +22,12 @@ bool InfluxDB_Reporter::report(AirData *air, CalculatedAQI *aqi, EnvironmentData
         measurement.addTag("location", _sensorLocation);
     }
 
-    measurement.addField("p1_0", (int)air->p1_0);
-    measurement.addField("p2_5", (int)air->p2_5);
-    measurement.addField("p10_0", (int)air->p10_0);
+    if (air)
+    {
+        measurement.addField("p1_0", (int)air->p1_0);
+        measurement.addField("p2_5", (int)air->p2_5);
+        measurement.addField("p10_0", (int)air->p10_0);
+    }
 
     if (aqi)
     {

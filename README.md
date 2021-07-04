@@ -92,6 +92,10 @@ Changes which are not backwards compatible will be listed here. Anton is under
 active development and does not have a fixed feature set, nor does it have
 version numbers yet. For now, changes will be listed by date.
 
+* **2021-07-04** Moves from [WifiManager][] to [IotWebConf][]. *This is a
+  backwards incompatible change.* You will need to reconfigure the sensor after
+  upgrading.
+
 * **2020-10-22** Moved from the deprecated `SPIFFS` to the still-maintained
   `LittleFS`. *This is a backwards incompatible change.* You will need to
   reconfigure the sensor after upgrading.
@@ -99,6 +103,9 @@ version numbers yet. For now, changes will be listed by date.
 * **2020-10-03** earlier versions of Anton submitted values to InfluxDB as
   floats; this has been corrected to use integer values. Updating will require
   you to either use a new database or rewrite your existing one.
+
+[WifiManager]: https://github.com/tzapu/WiFiManager
+[IotWebConf]: https://github.com/prampec/IotWebConf
 
 ## Acknowledgements
 

@@ -1,22 +1,24 @@
 #include <Arduino.h>
-
-#include <ArduinoJson.h>
-
-#include <ESP8266WiFi.h>
-#include <DNSServer.h>
-#include <ESP8266WebServer.h>
-#include <WiFiManager.h>
-#include <WiFiClient.h>
-#include <LittleFS.h>
-
 #include <SoftwareSerial.h>
+
 #include <AQI.h>
 
+#include <IotWebConf.h>
+#include <IotWebConfTParameter.h>
+
+#ifdef ESP8266
+#include <ESP8266HTTPUpdateServer.h>
+#elif defined(ESP32)
+// For ESP32 IotWebConf provides a drop-in replacement for UpdateServer.
+#include <IotWebConfESP32HTTPUpdateServer.h>
+#endif
+
 #include "strings.h"
-#include "sensors/AirSensor.h"
-#include "sensors/ZH03B_AirSensor.h"
+
 #include "reporters/Reporter.h"
 #include "reporters/InfluxDB_Reporter.h"
+#include "sensors/AirSensor.h"
+#include "sensors/ZH03B_AirSensor.h"
 #include "sensors/EnvironmentSensor.h"
 #include "sensors/BME680_EnvironmentSensor.h"
 #include "util.h"
@@ -25,26 +27,23 @@
 #define GIT_REV "Unknown"
 #endif
 
-char sensor_name[40] = "anton-default";
-char sensor_location[40] = "";
-char influxdb_server[100] = "influxdb";
-char influxdb_port[6] = "8086";
-char influxdb_database[40] = "anton";
+#define CONFIG_VERSION "v2"
+#define PRODUCT_NAME "anton"
+#define DEFAULT_PASSWORD "anton-system"
 
-char influxdb_url[200] = "";
+#define STRING_LEN 128
 
-bool configured = false;
-bool should_save_config = false;
+// global variables
+bool ready = false;
+int wakeupFailCounter = 0;
+int lastMeasured = 0;
+AirData lastAirData;
+EnvironmentData lastEnvironmentData;
+char lastStatus[10] = "NONE";
+int lastAQI = 0;
+char lastPrimaryContributor[5] = "NONE";
 
-int wakeup_fail_counter = 0;
-int connection_fail_counter = 0;
-int last_measured = 0;
-AirData last_values;
-EnvironmentData last_env;
-char last_status[10] = "NONE";
-int last_aqi = 0;
-char last_primary_contributor[5] = "NONE";
-
+// constants
 static const int NUM_SAMPLES = 10;
 static const int MIN_SAMPLES_FOR_SUCCESS = 4;
 static const int SENSOR_STARTUP_DELAY = 10000;
@@ -54,20 +53,96 @@ static const int MAX_JSON_DOCUMENT_SIZE = 2048;
 static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const int MAX_CONNECTION_FAIL = 5;
 
+// constants initialized at setup
+char influxdbURL[200] = "";
+
+// callbacks
+void wifiConnected();
+
+DNSServer dnsServer;
+WebServer server(80);
+
+#ifdef ESP8266
+ESP8266HTTPUpdateServer httpUpdater;
+#elif defined(ESP32)
+HTTPUpdateServer httpUpdater;
+#endif
+
+IotWebConf iotWebConf(PRODUCT_NAME, &dnsServer, &server, DEFAULT_PASSWORD, CONFIG_VERSION);
+
+iotwebconf::ParameterGroup sensorGroup = iotwebconf::ParameterGroup("sensorGroup", "Reporting");
+iotwebconf::TextTParameter<STRING_LEN> sensorName =
+    iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("sensorName")
+        .label("Sensor Name")
+        .defaultValue("anton-default")
+        .build();
+iotwebconf::TextTParameter<STRING_LEN> sensorLocation =
+    iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("sensorLocation")
+        .label("Sensor Location")
+        .defaultValue("")
+        .build();
+
+iotwebconf::ParameterGroup influxdbGroup = iotwebconf::ParameterGroup("influxdbGroup", "InfluxDB");
+iotwebconf::TextTParameter<STRING_LEN> influxdbHost =
+    iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("influxdbHost")
+        .label("Host")
+        .defaultValue("influxdb")
+        .build();
+iotwebconf::IntTParameter<uint16_t> influxdbPort =
+    iotwebconf::Builder<iotwebconf::IntTParameter<uint16_t>>("influxdbPort")
+        .label("Port")
+        .defaultValue(8086)
+        .min(1)
+        .max(65535)
+        .step(1)
+        .placeholder("8086")
+        .build();
+iotwebconf::TextTParameter<STRING_LEN> influxdbDatabase =
+    iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("influxdbDatabase")
+        .label("Database Name")
+        .defaultValue("anton")
+        .build();
+
+static const char particleSensorValues[][STRING_LEN] = {"zh03b"};
+static const char particleSensorNames[][STRING_LEN] = {"Winsen ZH03B"};
+iotwebconf::ParameterGroup particleSensorGroup = iotwebconf::ParameterGroup("particleSensorGroup", "Particulate Sensor");
+iotwebconf::CheckboxTParameter particleSensorEnable =
+    iotwebconf::Builder<iotwebconf::CheckboxTParameter>("particleSensorEnable")
+        .label("Enabled")
+        .defaultValue(true)
+        .build();
+iotwebconf::SelectTParameter<STRING_LEN> particleSensor =
+    iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("particleSensor")
+        .label("Sensor")
+        .optionValues((const char *)particleSensorValues)
+        .optionNames((const char *)particleSensorNames)
+        .optionCount(sizeof(particleSensorValues) / STRING_LEN)
+        .nameLength(STRING_LEN)
+        .defaultValue("zh03b")
+        .build();
+
+static const char vocSensorValues[][STRING_LEN] = {"bme680"};
+static const char vocSensorNames[][STRING_LEN] = {"Bosch BME680"};
+iotwebconf::ParameterGroup vocSensorGroup = iotwebconf::ParameterGroup("vocSensorGroup", "VOC Sensor");
+iotwebconf::CheckboxTParameter vocSensorEnable =
+    iotwebconf::Builder<iotwebconf::CheckboxTParameter>("vocSensorEnable")
+        .label("Enabled")
+        .defaultValue(true)
+        .build();
+iotwebconf::SelectTParameter<STRING_LEN> vocSensor =
+    iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("vocSensor")
+        .label("Sensor")
+        .optionValues((const char *)vocSensorValues)
+        .optionNames((const char *)vocSensorNames)
+        .optionCount(sizeof(vocSensorValues) / STRING_LEN)
+        .nameLength(STRING_LEN)
+        .defaultValue("zh03b")
+        .build();
+
 SoftwareSerial ZHSerial(D3, D4); // RX, TX
-AirSensor *sensor;
-Reporter *reporter;
-EnvironmentSensor *environment;
-
-// web server; we only start this once configured, otherwise we rely on the
-// configuration page that WiFiManager provides.
-ESP8266WebServer server(80);
-
-void save_config_callback()
-{
-  Serial.println("config: should save config");
-  should_save_config = true;
-}
+AirSensor *airSensor = nullptr;
+Reporter *reporter = nullptr;
+EnvironmentSensor *environmentSensor;
 
 void _delay(unsigned long ms)
 {
@@ -75,7 +150,7 @@ void _delay(unsigned long ms)
 
   while (1)
   {
-    server.handleClient();
+    iotWebConf.doLoop();
     delay(100);
     if (millis() - now > ms)
     {
@@ -84,320 +159,200 @@ void _delay(unsigned long ms)
   }
 }
 
-void reset_all()
+void resetAll()
 {
-  WiFi.disconnect();
-  LittleFS.format();
+  iotWebConf.getSystemParameterGroup()->applyDefaultValue();
+  iotWebConf.getWifiParameterGroup()->applyDefaultValue();
+  sensorGroup.applyDefaultValue();
+  influxdbGroup.applyDefaultValue();
+  particleSensorGroup.applyDefaultValue();
+  vocSensorGroup.applyDefaultValue();
+  iotWebConf.saveConfig();
   ESP.restart();
 }
 
-void read_config()
+void hardReset()
 {
-  Serial.println("config: mounting file system");
-
-  if (LittleFS.begin())
-  {
-    Serial.println("config: file system mounted");
-    if (LittleFS.exists("/config.json"))
-    {
-      Serial.println("config: file exists");
-
-      File configFile = LittleFS.open("/config.json", "r");
-      if (configFile)
-      {
-        Serial.println("config: opened file");
-
-        DynamicJsonDocument doc(MAX_JSON_DOCUMENT_SIZE);
-
-        deserializeJson(doc, configFile);
-
-        if (!doc.isNull())
-        {
-          Serial.print("config: parsed json: ");
-          serializeJson(doc, Serial);
-          Serial.print("\n");
-
-          strcpy(sensor_name, doc["sensor_name"]);
-          strcpy(influxdb_server, doc["influxdb_server"]);
-          strcpy(influxdb_port, doc["influxdb_port"]);
-          strcpy(influxdb_database, doc["influxdb_database"]);
-
-          // values added after the initial firmware, may be unset
-          if (doc["sensor_location"])
-          {
-            strcpy(sensor_location, doc["sensor_location"]);
-          }
-
-          configured = true;
-        }
-        else
-        {
-          Serial.println("config: failed to load json");
-        }
-
-        configFile.close();
-      }
-    }
-  }
-  else
-  {
-    Serial.println("config: failed to mount file system");
-  }
+  util::clearEEPROM();
+  ESP.reset();
 }
 
-void save_config()
-{
-  Serial.println("config: saving config");
-
-  DynamicJsonDocument doc(MAX_JSON_DOCUMENT_SIZE);
-
-  doc["sensor_name"] = sensor_name;
-  doc["sensor_location"] = sensor_location;
-  doc["influxdb_server"] = influxdb_server;
-  doc["influxdb_port"] = influxdb_port;
-  doc["influxdb_database"] = influxdb_database;
-
-  File configFile = LittleFS.open("/config.json", "w");
-  if (!configFile)
-  {
-    Serial.println("config: failed to open file for writing");
-    return;
-  }
-
-  serializeJson(doc, configFile);
-  serializeJson(doc, Serial);
-
-  configFile.close();
-  configured = true;
-}
-
-void render_index_page(char *buf)
+void renderIndexPage(char *buf)
 {
   int last = -1;
-  if (last_measured > 0)
+  if (lastMeasured > 0)
   {
-    last = (millis() - last_measured) / 1000;
+    last = (millis() - lastMeasured) / 1000;
   }
   sprintf(
       buf,
       serverIndex,
       last,
-      last_status,
-      util::rnd(last_env.tempC),
-      util::rnd(last_env.humPct),
-      util::rnd(last_env.iaq),
-      last_aqi,
-      last_primary_contributor,
+      lastStatus,
+      util::rnd(lastEnvironmentData.tempC),
+      util::rnd(lastEnvironmentData.humPct),
+      util::rnd(lastEnvironmentData.iaq),
+      lastAQI,
+      lastPrimaryContributor,
       millis() / 1000,
-      sensor_name,
-      influxdb_url,
+      sensorName.value(),
+      influxdbURL,
       GIT_REV);
 }
 
-void render_config_page(char *buf)
+void handleRoot()
 {
-  sprintf(
-      buf,
-      configPage,
-      sensor_name,
-      sensor_location,
-      influxdb_server,
-      influxdb_port,
-      influxdb_database);
-}
+  // -- Let IotWebConf test and handle captive portal requests.
+  if (iotWebConf.handleCaptivePortal())
+  {
+    // -- Captive portal request were already served.
+    return;
+  }
 
-void run_http_server()
-{
-  server.on("/", HTTP_GET, []() {
-    Serial.println("http: serving index");
-    server.sendHeader("Connection", "close");
-    char buf[1024] = "";
-    render_index_page(buf);
-    server.send(200, "text/html", buf);
-  });
+  char buf[2048];
+  renderIndexPage(buf);
 
-  server.on("/config", HTTP_GET, []() {
-    Serial.println("http: serving config");
-    server.sendHeader("Connection", "close");
-    char buf[2048] = "";
-    render_config_page(buf);
-    server.send(200, "text/html", buf);
-  });
-
-  server.on("/config", HTTP_POST, []() {
-    Serial.println("http: saving config");
-
-    if (server.hasArg("sensor_name"))
-    {
-      strcpy(sensor_name, server.arg("sensor_name").c_str());
-    }
-    if (server.hasArg("sensor_location"))
-    {
-      strcpy(sensor_location, server.arg("sensor_location").c_str());
-    }
-    if (server.hasArg("influxdb_server"))
-    {
-      strcpy(influxdb_server, server.arg("influxdb_server").c_str());
-    }
-    if (server.hasArg("influxdb_port"))
-    {
-      strcpy(influxdb_port, server.arg("influxdb_port").c_str());
-    }
-    if (server.hasArg("influxdb_database"))
-    {
-      strcpy(influxdb_database, server.arg("influxdb_database").c_str());
-    }
-
-    save_config();
-    Serial.println("http: config saved, restarting");
-
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", "saved, restarting");
-    delay(100);
-    ESP.restart();
-  });
-
-  server.on("/reset", HTTP_GET, []() {
-    Serial.println("http: serving reset");
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/html", resetPage);
-  });
-
-  server.on("/reboot", HTTP_POST, []() {
-    Serial.println("http: serving reboot");
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", "rebooting");
-    ESP.restart();
-  });
-
-  server.on("/reset-confirm", HTTP_POST, []() {
-    Serial.println("http: serving reset confirm");
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", "resetting");
-    reset_all();
-  });
-
-  server.on(
-      "/update",
-      HTTP_POST,
-      []() {
-        server.sendHeader("Connection", "close");
-        server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-        ESP.restart();
-      },
-      []() {
-        HTTPUpload &upload = server.upload();
-        if (upload.status == UPLOAD_FILE_START)
-        {
-          Serial.setDebugOutput(true);
-          WiFiUDP::stopAll();
-          Serial.printf("Update: %s\n", upload.filename.c_str());
-          uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-          if (!Update.begin(maxSketchSpace))
-          { //start with max available size
-            Update.printError(Serial);
-          }
-        }
-        else if (upload.status == UPLOAD_FILE_WRITE)
-        {
-          if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
-          {
-            Update.printError(Serial);
-          }
-        }
-        else if (upload.status == UPLOAD_FILE_END)
-        {
-          if (Update.end(true))
-          { //true to set the size to the current progress
-            Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-          }
-          else
-          {
-            Update.printError(Serial);
-          }
-          Serial.setDebugOutput(false);
-        }
-        yield();
-      });
-
-  Serial.println("http: running server");
-  server.begin();
+  server.send(200, "text/html", buf);
 }
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.printf("setup: starting version %s\n", GIT_REV);
-  WiFiManager wifiManager;
-  wifiManager.setSaveConfigCallback(save_config_callback);
 
-  read_config();
+  sensorGroup.addItem(&sensorName);
+  sensorGroup.addItem(&sensorLocation);
+  iotWebConf.addParameterGroup(&sensorGroup);
 
-  WiFiManagerParameter sensor_name_param("sensor_name", "sensor name", sensor_name, 40);
-  wifiManager.addParameter(&sensor_name_param);
-  WiFiManagerParameter sensor_location_param("sensor_location", "sensor location", sensor_location, 40);
-  wifiManager.addParameter(&sensor_location_param);
-  WiFiManagerParameter influxdb_server_param("influxdb_server", "influxdb server", influxdb_server, 100);
-  wifiManager.addParameter(&influxdb_server_param);
-  WiFiManagerParameter influxdb_port_param("influxdb_port", "influxdb port", influxdb_port, 6);
-  wifiManager.addParameter(&influxdb_port_param);
-  WiFiManagerParameter influxdb_database_param("influxdb_database", "influxdb database", influxdb_database, 40);
-  wifiManager.addParameter(&influxdb_database_param);
+  influxdbGroup.addItem(&influxdbHost);
+  influxdbGroup.addItem(&influxdbPort);
+  influxdbGroup.addItem(&influxdbDatabase);
+  iotWebConf.addParameterGroup(&influxdbGroup);
 
-  wifiManager.autoConnect("anton-setup");
-  Serial.println("setup: wifi connected");
+  particleSensorGroup.addItem(&particleSensorEnable);
+  particleSensorGroup.addItem(&particleSensor);
+  iotWebConf.addParameterGroup(&particleSensorGroup);
 
-  //read updated parameters
-  strcpy(sensor_name, sensor_name_param.getValue());
-  strcpy(sensor_location, sensor_location_param.getValue());
-  strcpy(influxdb_server, influxdb_server_param.getValue());
-  strcpy(influxdb_port, influxdb_port_param.getValue());
-  strcpy(influxdb_database, influxdb_database_param.getValue());
+  vocSensorGroup.addItem(&vocSensorEnable);
+  vocSensorGroup.addItem(&vocSensor);
+  iotWebConf.addParameterGroup(&vocSensorGroup);
 
-  // create influxdb url
-  sprintf(influxdb_url, "http://%s:%s", influxdb_server, influxdb_port);
-  Serial.printf("setup: influxdb url: %s\n", influxdb_url);
+  iotWebConf.setWifiConnectionCallback(&wifiConnected);
+  iotWebConf.setWifiConnectionTimeoutMs(60000);
 
-  if (should_save_config)
-  {
-    save_config();
-  }
+  iotWebConf.setupUpdateServer(
+      [](const char *updatePath)
+      { httpUpdater.setup(&server, updatePath); },
+      [](const char *userName, char *password)
+      { httpUpdater.updateCredentials(userName, password); });
 
-  // start http server
-  run_http_server();
+  iotWebConf.init();
+
+  server.on("/", handleRoot);
+  server.on("/config", []
+            { iotWebConf.handleConfig(); });
+  server.onNotFound([]()
+                    { iotWebConf.handleNotFound(); });
+
+  server.on("/reset", HTTP_GET, []()
+            {
+              Serial.println("http: serving reset");
+              server.sendHeader("Connection", "close");
+              server.send(200, "text/html", resetPage);
+            });
+  server.on("/reboot", HTTP_POST, []()
+            {
+              Serial.println("http: serving reboot");
+              server.sendHeader("Connection", "close");
+              server.send(200, "text/plain", "rebooting");
+              ESP.restart();
+            });
+  server.on("/reset-confirm", HTTP_POST, []()
+            {
+              Serial.println("http: serving reset confirm");
+              server.sendHeader("Connection", "close");
+              server.send(200, "text/plain", "resetting");
+              resetAll();
+            });
+  server.on("/hard-reset-confirm", HTTP_POST, []()
+            {
+              Serial.println("http: serving hard reset confirm");
+              server.sendHeader("Connection", "close");
+              server.send(200, "text/plain", "resetting");
+              hardReset();
+            });
+
+  sprintf(influxdbURL, "http://%s:%d", influxdbHost.value(), influxdbPort.value());
+  Serial.printf("setup: influxdb url: %s\n", influxdbURL);
 
   // set up reporter
-  InfluxDB_Reporter *DB = new InfluxDB_Reporter(sensor_name,
-                                                sensor_location,
-                                                influxdb_url,
-                                                influxdb_database);
+  InfluxDB_Reporter *DB = new InfluxDB_Reporter(sensorName.value(),
+                                                sensorLocation.value(),
+                                                influxdbURL,
+                                                influxdbDatabase.value());
   reporter = DB;
 
-  // set up ZH03B sensor
-  ZHSerial.begin(9600);
-  ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
-  sensor = ZH;
+  if (particleSensorEnable.value())
+  {
+    // TODO: support alternate sensors
+    ZHSerial.begin(9600);
+    ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
+    airSensor = ZH;
+  }
 
-  BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
-  environment = BME;
+  if (vocSensorEnable.value())
+  {
+    BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
+    environmentSensor = BME;
+  }
 }
 
-int sort_uint16_desc(const void *cmp1, const void *cmp2)
+void wifiConnected()
+{
+  Serial.println("setup: wifi connected");
+  ready = true;
+}
+
+int sortUint16Desc(const void *cmp1, const void *cmp2)
 {
   uint16_t a = *((uint16_t *)cmp1);
   uint16_t b = *((uint16_t *)cmp2);
   return b - a;
 }
 
-uint16_t median_value(uint16_t *values, int count)
+uint16_t medianValue(uint16_t *values, int count)
 {
-  qsort(values, count, sizeof(values[0]), sort_uint16_desc);
+  qsort(values, count, sizeof(values[0]), sortUint16Desc);
 
   return values[(count / 2) - 1];
 }
 
-bool sample_sensor(AirData *sample)
+bool sampleParticleSensor(AirData *sample)
 {
+  // wake sensor
+  if (airSensor->wake())
+  {
+    Serial.println("loop: sensor wakeup successful");
+    wakeupFailCounter = 0;
+  }
+  else if (wakeupFailCounter >= MAX_SENSOR_WAKE_FAIL)
+  {
+    Serial.printf("loop: ERROR failed to wake sensor %d times; resetting", wakeupFailCounter);
+    ESP.restart();
+    return false;
+  }
+  else
+  {
+    Serial.println("loop: ERROR failed to wake the sensor; delaying and trying again");
+    wakeupFailCounter += 1;
+    _delay(30000);
+    return false;
+  }
+
+  // delay after sensor start; waking the sensor starts its fan, and we want to
+  // wait for a period before actually sampling it.
+  _delay(SENSOR_STARTUP_DELAY);
+
   Serial.println("sensor: attemping average sample");
   uint16_t pm1_0[NUM_SAMPLES];
   uint16_t pm2_5[NUM_SAMPLES];
@@ -407,7 +362,7 @@ bool sample_sensor(AirData *sample)
   AirData buf;
   for (int i = 0; i < NUM_SAMPLES; i++)
   {
-    if (sensor->getAirData(&buf))
+    if (airSensor->getAirData(&buf))
     {
       if (buf.p1_0 == buf.p2_5 && buf.p2_5 == buf.p10_0 && buf.p1_0 > 500)
       {
@@ -426,97 +381,8 @@ bool sample_sensor(AirData *sample)
     _delay(SAMPLE_DELAY);
   }
 
-  if (successes < MIN_SAMPLES_FOR_SUCCESS)
-  {
-    Serial.println("sensor: failed to get minimum number of samples");
-    return false;
-  }
-
-  sample->p1_0 = median_value(pm1_0, successes);
-  sample->p2_5 = median_value(pm2_5, successes);
-  sample->p10_0 = median_value(pm10_0, successes);
-
-  return true;
-}
-
-void loop()
-{
-  if (!configured)
-  {
-    Serial.println("loop: unconfigured, resetting");
-    reset_all();
-    delay(5000);
-    return;
-  }
-
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.println("loop: wifi not connected; delaying");
-    connection_fail_counter++;
-    if (connection_fail_counter > 10)
-    {
-      Serial.println("loop: exceeded wifi connection failures, restarting");
-      ESP.restart();
-    }
-    _delay(30000);
-    return;
-  }
-  else
-  {
-    connection_fail_counter = 0;
-  }
-
-  // wake sensor
-  if (sensor->wake())
-  {
-    Serial.println("loop: sensor wakeup successfully");
-    wakeup_fail_counter = 0;
-  }
-  else if (wakeup_fail_counter >= MAX_SENSOR_WAKE_FAIL)
-  {
-    Serial.printf("loop: ERROR failed to wake sensor %d times; resetting", wakeup_fail_counter);
-    ESP.restart();
-    return;
-  }
-  else
-  {
-    Serial.println("loop: ERROR failed to wake the sensor; delaying and trying again");
-    wakeup_fail_counter += 1;
-    _delay(30000);
-    return;
-  }
-
-  // delay after sensor start; waking the sensor starts its fan, and we want to
-  // wait for a period before actually sampling it.
-  _delay(SENSOR_STARTUP_DELAY);
-
-  EnvironmentData envSample;
-  bool envSuccess = environment->getEnvironmentData(&envSample);
-  if (envSuccess)
-  {
-    last_env = envSample;
-  }
-
-  AirData sample;
-  bool success = sample_sensor(&sample);
-  if (success)
-  {
-    Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
-                  sample.p1_0,
-                  sample.p2_5,
-                  sample.p10_0);
-    last_values = sample;
-    last_measured = millis();
-    strcpy(last_status, "SUCCESS");
-  }
-  else
-  {
-    Serial.println("loop: failed to sample sensor");
-    strcpy(last_status, "FAILURE");
-  }
-
   // shut down sensor, stopping its fan.
-  if (sensor->sleep())
+  if (airSensor->sleep())
   {
     Serial.println("loop: sensor sleep successful");
   }
@@ -525,29 +391,87 @@ void loop()
     Serial.println("loop: ERROR failed to sleep the sensor");
   }
 
-  if (success)
+  if (successes < MIN_SAMPLES_FOR_SUCCESS)
   {
-    CalculatedAQI aqi;
-    bool aqi_success = calculateAQI(sample, &aqi);
-    if (reporter->report(&sample, aqi_success ? &aqi : nullptr, envSuccess ? &envSample : nullptr))
-    {
-      Serial.println("loop: sample submitted successfully");
-    }
-    else
-    {
-      Serial.println("loop: failed to submit sample");
-    }
+    Serial.println("sensor: failed to get minimum number of samples");
+    return false;
+  }
 
-    if (aqi_success)
+  sample->p1_0 = medianValue(pm1_0, successes);
+  sample->p2_5 = medianValue(pm2_5, successes);
+  sample->p10_0 = medianValue(pm10_0, successes);
+
+  return true;
+}
+
+void loop()
+{
+  iotWebConf.doLoop();
+  if (!ready)
+  {
+    return;
+  }
+
+  EnvironmentData envSample;
+  bool envSuccess = false;
+  if (environmentSensor)
+  {
+    envSuccess = environmentSensor->getEnvironmentData(&envSample);
+    if (envSuccess)
     {
-      last_aqi = aqi.value;
-      strcpy(last_primary_contributor, aqi.pollutant);
+      lastEnvironmentData = envSample;
+    }
+  }
+
+  AirData airSample;
+  bool airSuccess = false;
+  if (airSensor)
+  {
+    airSuccess = sampleParticleSensor(&airSample);
+    if (airSuccess)
+    {
+      Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
+                    airSample.p1_0,
+                    airSample.p2_5,
+                    airSample.p10_0);
+      lastAirData = airSample;
+      lastMeasured = millis();
+      strcpy(lastStatus, "SUCCESS");
     }
     else
     {
-      last_aqi = -1;
-      strcpy(last_primary_contributor, "NONE");
+      Serial.println("loop: failed to sample sensor");
+      strcpy(lastStatus, "FAILURE");
     }
+  }
+
+  CalculatedAQI aqi;
+  bool aqiSuccess = false;
+
+  if (airSuccess)
+  {
+    aqiSuccess = calculateAQI(airSample, &aqi);
+  }
+
+  if (reporter->report(airSuccess ? &airSample : nullptr, aqiSuccess ? &aqi : nullptr, envSuccess ? &envSample : nullptr))
+  {
+    Serial.println("loop: sample submitted successfully");
+  }
+  else
+  {
+    Serial.println("loop: failed to submit sample");
+    Serial.println(reporter->getLastErrorMessage());
+  }
+
+  if (aqiSuccess)
+  {
+    lastAQI = aqi.value;
+    strcpy(lastPrimaryContributor, aqi.pollutant);
+  }
+  else
+  {
+    lastAQI = -1;
+    strcpy(lastPrimaryContributor, "NONE");
   }
 
   _delay(MEASUREMENT_DELAY);

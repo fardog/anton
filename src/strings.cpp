@@ -4,7 +4,7 @@ const char *serverIndex = R"(
 <!DOCTYPE html>
 <html>
   <body>
-    <h1>Measurements</h1>
+    <h1>Particulate Sensor</h1>
     Measured %d seconds ago; last result was %s.
     <dl>
       <dt>PM1.0</dt>
@@ -22,8 +22,22 @@ const char *serverIndex = R"(
       <dt>Primary Contributor</dt>
       <dd>%s</dd>
     </dl>
+
+    <h1>Environment</h1>
+    <dl>
+      <dt>Temperature (&deg;C)</dt>
+      <dd>%d</dd>
+
+      <dt>Humidity (&#37;RH)</dt>
+      <dd>%d</dd>
+      
+      <dt>IAQ</dt>
+      <dd>%d</dd>
+    </dl>
+
     <h1>Stats</h1>
     Uptime: %d seconds
+
     <h1>Configuration</h1>
     <dl>
       <dt>Sensor Name</dt>
@@ -33,6 +47,7 @@ const char *serverIndex = R"(
       <dd>%s</dd>
     </dl>
     Visit the <a href="/config">config page</a>.
+
     <h1>Reset</h1>
     Visit the <a href="/reset">reset page</a>.
     <footer>
@@ -42,6 +57,7 @@ const char *serverIndex = R"(
   </body>
 </html>
 )";
+
 const char *resetPage = R"(
 <!DOCTYPE html>
 <html>

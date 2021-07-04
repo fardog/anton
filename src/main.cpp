@@ -35,13 +35,13 @@
 
 // global variables
 bool ready = false;
-int wakeup_fail_counter = 0;
-int last_measured = 0;
-AirData last_values;
-EnvironmentData last_env;
-char last_status[10] = "NONE";
-int last_aqi = 0;
-char last_primary_contributor[5] = "NONE";
+int wakeupFailCounter = 0;
+int lastMeasured = 0;
+AirData lastAirData;
+EnvironmentData lastEnvironmentData;
+char lastStatus[10] = "NONE";
+int lastAQI = 0;
+char lastPrimaryContributor[5] = "NONE";
 
 // constants
 static const int NUM_SAMPLES = 10;
@@ -54,7 +54,7 @@ static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const int MAX_CONNECTION_FAIL = 5;
 
 // constants initialized at setup
-char influxdb_url[200] = "";
+char influxdbURL[200] = "";
 
 // callbacks
 void wifiConnected();
@@ -159,33 +159,33 @@ void _delay(unsigned long ms)
   }
 }
 
-void reset_all()
+void resetAll()
 {
   iotWebConf.getSystemParameterGroup()->applyDefaultValue();
   iotWebConf.saveConfig();
   ESP.restart();
 }
 
-void render_index_page(char *buf)
+void renderIndexPage(char *buf)
 {
   int last = -1;
-  if (last_measured > 0)
+  if (lastMeasured > 0)
   {
-    last = (millis() - last_measured) / 1000;
+    last = (millis() - lastMeasured) / 1000;
   }
   sprintf(
       buf,
       serverIndex,
       last,
-      last_status,
-      util::rnd(last_env.tempC),
-      util::rnd(last_env.humPct),
-      util::rnd(last_env.iaq),
-      last_aqi,
-      last_primary_contributor,
+      lastStatus,
+      util::rnd(lastEnvironmentData.tempC),
+      util::rnd(lastEnvironmentData.humPct),
+      util::rnd(lastEnvironmentData.iaq),
+      lastAQI,
+      lastPrimaryContributor,
       millis() / 1000,
       sensorName.value(),
-      influxdb_url,
+      influxdbURL,
       GIT_REV);
 }
 
@@ -199,7 +199,7 @@ void handleRoot()
   }
 
   char buf[2048];
-  render_index_page(buf);
+  renderIndexPage(buf);
 
   server.send(200, "text/html", buf);
 }
@@ -248,19 +248,19 @@ void setup()
     Serial.println("http: serving reset confirm");
     server.sendHeader("Connection", "close");
     server.send(200, "text/plain", "resetting");
-    reset_all();
+    resetAll();
   });
 
   server.on("/config", [] { iotWebConf.handleConfig(); });
   server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
-  sprintf(influxdb_url, "http://%s:%d", influxdbHost.value(), influxdbPort.value());
-  Serial.printf("setup: influxdb url: %s\n", influxdb_url);
+  sprintf(influxdbURL, "http://%s:%d", influxdbHost.value(), influxdbPort.value());
+  Serial.printf("setup: influxdb url: %s\n", influxdbURL);
 
   // set up reporter
   InfluxDB_Reporter *DB = new InfluxDB_Reporter(sensorName.value(),
                                                 sensorLocation.value(),
-                                                influxdb_url,
+                                                influxdbURL,
                                                 influxdbDatabase.value());
   reporter = DB;
 
@@ -282,38 +282,38 @@ void wifiConnected() {
   ready = true;
 }
 
-int sort_uint16_desc(const void *cmp1, const void *cmp2)
+int sortUint16Desc(const void *cmp1, const void *cmp2)
 {
   uint16_t a = *((uint16_t *)cmp1);
   uint16_t b = *((uint16_t *)cmp2);
   return b - a;
 }
 
-uint16_t median_value(uint16_t *values, int count)
+uint16_t medianValue(uint16_t *values, int count)
 {
-  qsort(values, count, sizeof(values[0]), sort_uint16_desc);
+  qsort(values, count, sizeof(values[0]), sortUint16Desc);
 
   return values[(count / 2) - 1];
 }
 
-bool sample_sensor(AirData *sample)
+bool sampleSensor(AirData *sample)
 {
   // wake sensor
   if (sensor->wake())
   {
     Serial.println("loop: sensor wakeup successful");
-    wakeup_fail_counter = 0;
+    wakeupFailCounter = 0;
   }
-  else if (wakeup_fail_counter >= MAX_SENSOR_WAKE_FAIL)
+  else if (wakeupFailCounter >= MAX_SENSOR_WAKE_FAIL)
   {
-    Serial.printf("loop: ERROR failed to wake sensor %d times; resetting", wakeup_fail_counter);
+    Serial.printf("loop: ERROR failed to wake sensor %d times; resetting", wakeupFailCounter);
     ESP.restart();
     return false;
   }
   else
   {
     Serial.println("loop: ERROR failed to wake the sensor; delaying and trying again");
-    wakeup_fail_counter += 1;
+    wakeupFailCounter += 1;
     _delay(30000);
     return false;
   }
@@ -366,9 +366,9 @@ bool sample_sensor(AirData *sample)
     return false;
   }
 
-  sample->p1_0 = median_value(pm1_0, successes);
-  sample->p2_5 = median_value(pm2_5, successes);
-  sample->p10_0 = median_value(pm10_0, successes);
+  sample->p1_0 = medianValue(pm1_0, successes);
+  sample->p2_5 = medianValue(pm2_5, successes);
+  sample->p10_0 = medianValue(pm10_0, successes);
 
   return true;
 }
@@ -386,28 +386,28 @@ void loop()
     envSuccess = environment->getEnvironmentData(&envSample);
     if (envSuccess)
     {
-      last_env = envSample;
+      lastEnvironmentData = envSample;
     }
   }
 
   AirData sample;
   bool success = false;
   if (sensor) {
-    success = sample_sensor(&sample);
+    success = sampleSensor(&sample);
     if (success)
     {
       Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
                     sample.p1_0,
                     sample.p2_5,
                     sample.p10_0);
-      last_values = sample;
-      last_measured = millis();
-      strcpy(last_status, "SUCCESS");
+      lastAirData = sample;
+      lastMeasured = millis();
+      strcpy(lastStatus, "SUCCESS");
     }
     else
     {
       Serial.println("loop: failed to sample sensor");
-      strcpy(last_status, "FAILURE");
+      strcpy(lastStatus, "FAILURE");
     }
   }
 
@@ -430,13 +430,13 @@ void loop()
 
   if (aqi_success)
   {
-    last_aqi = aqi.value;
-    strcpy(last_primary_contributor, aqi.pollutant);
+    lastAQI = aqi.value;
+    strcpy(lastPrimaryContributor, aqi.pollutant);
   }
   else
   {
-    last_aqi = -1;
-    strcpy(last_primary_contributor, "NONE");
+    lastAQI = -1;
+    strcpy(lastPrimaryContributor, "NONE");
   }
 
   _delay(MEASUREMENT_DELAY);

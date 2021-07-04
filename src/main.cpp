@@ -317,8 +317,8 @@ void setup()
   if (particleSensorEnable.value())
   {
     airSensorSerial = new SoftwareSerial(
-        strcmp(particleSensorRX.value(), "D1") ? D1 : D3,
-        strcmp(particleSensorTX.value(), "D2") ? D2 : D4);
+        strcmp(particleSensorRX.value(), "D1") ? D3 : D1,
+        strcmp(particleSensorTX.value(), "D2") ? D4 : D2);
     airSensorSerial->begin(9600);
     ZH03B_AirSensor *ZH = new ZH03B_AirSensor(*airSensorSerial);
     airSensor = ZH;

@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <LittleFS.h>
 #include <SoftwareSerial.h>
 
 #include <AQI.h>
@@ -34,13 +33,9 @@
 
 #define STRING_LEN 128
 
-char influxdb_url[200] = "";
-
-bool configured = false;
-bool should_save_config = false;
-
+// global variables
+bool ready = false;
 int wakeup_fail_counter = 0;
-int connection_fail_counter = 0;
 int last_measured = 0;
 AirData last_values;
 EnvironmentData last_env;
@@ -48,6 +43,7 @@ char last_status[10] = "NONE";
 int last_aqi = 0;
 char last_primary_contributor[5] = "NONE";
 
+// constants
 static const int NUM_SAMPLES = 10;
 static const int MIN_SAMPLES_FOR_SUCCESS = 4;
 static const int SENSOR_STARTUP_DELAY = 10000;
@@ -57,7 +53,10 @@ static const int MAX_JSON_DOCUMENT_SIZE = 2048;
 static const int MAX_SENSOR_WAKE_FAIL = 5;
 static const int MAX_CONNECTION_FAIL = 5;
 
-// callback definitions
+// constants initialized at setup
+char influxdb_url[200] = "";
+
+// callbacks
 void wifiConnected();
 
 DNSServer dnsServer;
@@ -71,7 +70,7 @@ WebServer server(80);
 
 IotWebConf iotWebConf(PRODUCT_NAME, &dnsServer, &server, DEFAULT_PASSWORD, CONFIG_VERSION);
 
-iotwebconf::ParameterGroup sensorGroup = iotwebconf::ParameterGroup("sensorGroup", "");
+iotwebconf::ParameterGroup sensorGroup = iotwebconf::ParameterGroup("sensorGroup", "Reporting");
 iotwebconf::TextTParameter<STRING_LEN> sensorName =
   iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("sensorName")
   .label("Sensor Name")
@@ -162,8 +161,8 @@ void _delay(unsigned long ms)
 
 void reset_all()
 {
-  WiFi.disconnect();
-  LittleFS.format();
+  iotWebConf.getSystemParameterGroup()->applyDefaultValue();
+  iotWebConf.saveConfig();
   ESP.restart();
 }
 
@@ -199,13 +198,6 @@ void handleRoot()
     return;
   }
 
-  if (!configured)
-  {
-    server.sendHeader("Location", String("/config"), true);
-    server.send(302, "text/plain", "");
-    return;
-  }
-
   char buf[2048];
   render_index_page(buf);
 
@@ -214,7 +206,7 @@ void handleRoot()
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.printf("setup: starting version %s\n", GIT_REV);
 
   sensorGroup.addItem(&sensorName);
@@ -235,11 +227,8 @@ void setup()
   iotWebConf.addParameterGroup(&vocSensorGroup);
 
   iotWebConf.setWifiConnectionCallback(&wifiConnected);
-  iotWebConf.getApTimeoutParameter()->visible = true;
-  iotWebConf.setupUpdateServer(
-      [](const char* updatePath) { httpUpdater.setup(&server, updatePath); },
-      [](const char* userName, char* password) { httpUpdater.updateCredentials(userName, password); });
-
+  iotWebConf.setWifiConnectionTimeoutMs(60000);
+  
   iotWebConf.init();
 
   server.on("/", handleRoot);
@@ -288,9 +277,9 @@ void setup()
   }
 }
 
-void wifiConnected()
-{
-  configured = true;
+void wifiConnected() {
+  Serial.println("setup: wifi connected");
+  ready = true;
 }
 
 int sort_uint16_desc(const void *cmp1, const void *cmp2)
@@ -312,7 +301,7 @@ bool sample_sensor(AirData *sample)
   // wake sensor
   if (sensor->wake())
   {
-    Serial.println("loop: sensor wakeup successfully");
+    Serial.println("loop: sensor wakeup successful");
     wakeup_fail_counter = 0;
   }
   else if (wakeup_fail_counter >= MAX_SENSOR_WAKE_FAIL)
@@ -386,27 +375,9 @@ bool sample_sensor(AirData *sample)
 
 void loop()
 {
-  if (!configured)
-  {
-    iotWebConf.doLoop();
+  iotWebConf.doLoop();
+  if (!ready) {
     return;
-  }
-
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.println("loop: wifi not connected; delaying");
-    connection_fail_counter++;
-    if (connection_fail_counter > 10)
-    {
-      Serial.println("loop: exceeded wifi connection failures, restarting");
-      ESP.restart();
-    }
-    _delay(30000);
-    return;
-  }
-  else
-  {
-    connection_fail_counter = 0;
   }
 
   EnvironmentData envSample;

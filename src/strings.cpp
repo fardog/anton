@@ -33,11 +33,6 @@ const char *serverIndex = R"(
       <dd>%s</dd>
     </dl>
     Visit the <a href="/config">config page</a>.
-    <h1>Update</h1>
-    <form method="POST" action="/update" enctype="multipart/form-data">
-      <input type="file" name="update">
-      <input type="submit" value="Update">
-    </form>
     <h1>Reset</h1>
     Visit the <a href="/reset">reset page</a>.
     <footer>
@@ -60,6 +55,11 @@ const char *resetPage = R"(
     <h1>Reset All</h1>
     This will reset the sensor to its default values, and put it into setup mode.
     <form method="POST" action="/reset-confirm">
+      <input type="submit" value="Reset All">
+    </form>
+    <h1>Hard Reset</h1>
+    This will erase all EEPROM and reboot; recommended only when all else fails.
+    <form method="POST" action="/hard-reset-confirm">
       <input type="submit" value="Reset All">
     </form>
   </body>

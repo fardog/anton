@@ -6,6 +6,7 @@
 namespace util
 {
     int rnd(float val);
+    void clearEEPROM();
 } // namespace util
 
 #endif

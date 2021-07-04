@@ -7,10 +7,10 @@
 #include <IotWebConfTParameter.h>
 
 #ifdef ESP8266
-  #include <ESP8266HTTPUpdateServer.h>
+#include <ESP8266HTTPUpdateServer.h>
 #elif defined(ESP32)
-  // For ESP32 IotWebConf provides a drop-in replacement for UpdateServer.
-  #include <IotWebConfESP32HTTPUpdateServer.h>
+// For ESP32 IotWebConf provides a drop-in replacement for UpdateServer.
+#include <IotWebConfESP32HTTPUpdateServer.h>
 #endif
 
 #include "strings.h"
@@ -63,81 +63,81 @@ DNSServer dnsServer;
 WebServer server(80);
 
 #ifdef ESP8266
-  ESP8266HTTPUpdateServer httpUpdater;
+ESP8266HTTPUpdateServer httpUpdater;
 #elif defined(ESP32)
-  HTTPUpdateServer httpUpdater;
+HTTPUpdateServer httpUpdater;
 #endif
 
 IotWebConf iotWebConf(PRODUCT_NAME, &dnsServer, &server, DEFAULT_PASSWORD, CONFIG_VERSION);
 
 iotwebconf::ParameterGroup sensorGroup = iotwebconf::ParameterGroup("sensorGroup", "Reporting");
 iotwebconf::TextTParameter<STRING_LEN> sensorName =
-  iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("sensorName")
-  .label("Sensor Name")
-  .defaultValue("anton-default")
-  .build();
+    iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("sensorName")
+        .label("Sensor Name")
+        .defaultValue("anton-default")
+        .build();
 iotwebconf::TextTParameter<STRING_LEN> sensorLocation =
-  iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("sensorLocation")
-  .label("Sensor Location")
-  .defaultValue("")
-  .build();
+    iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("sensorLocation")
+        .label("Sensor Location")
+        .defaultValue("")
+        .build();
 
 iotwebconf::ParameterGroup influxdbGroup = iotwebconf::ParameterGroup("influxdbGroup", "InfluxDB");
 iotwebconf::TextTParameter<STRING_LEN> influxdbHost =
-  iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("influxdbHost")
-  .label("Host")
-  .defaultValue("influxdb")
-  .build();
+    iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("influxdbHost")
+        .label("Host")
+        .defaultValue("influxdb")
+        .build();
 iotwebconf::IntTParameter<uint16_t> influxdbPort =
-  iotwebconf::Builder<iotwebconf::IntTParameter<uint16_t>>("influxdbPort")
-  .label("Port")
-  .defaultValue(8086)
-  .min(1)
-  .max(65535)
-  .step(1)
-  .placeholder("8086")
-  .build();
+    iotwebconf::Builder<iotwebconf::IntTParameter<uint16_t>>("influxdbPort")
+        .label("Port")
+        .defaultValue(8086)
+        .min(1)
+        .max(65535)
+        .step(1)
+        .placeholder("8086")
+        .build();
 iotwebconf::TextTParameter<STRING_LEN> influxdbDatabase =
-  iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("influxdbDatabase")
-  .label("Database Name")
-  .defaultValue("anton")
-  .build();
+    iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("influxdbDatabase")
+        .label("Database Name")
+        .defaultValue("anton")
+        .build();
 
-static const char particleSensorValues[][STRING_LEN] = { "zh03b" };
-static const char particleSensorNames[][STRING_LEN] = { "Winsen ZH03B" };
+static const char particleSensorValues[][STRING_LEN] = {"zh03b"};
+static const char particleSensorNames[][STRING_LEN] = {"Winsen ZH03B"};
 iotwebconf::ParameterGroup particleSensorGroup = iotwebconf::ParameterGroup("particleSensorGroup", "Particulate Sensor");
 iotwebconf::CheckboxTParameter particleSensorEnable =
-  iotwebconf::Builder<iotwebconf::CheckboxTParameter>("particleSensorEnable")
-  .label("Enabled")
-  .defaultValue(true)
-  .build();
-iotwebconf::SelectTParameter<STRING_LEN> particleSensor = 
-iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("particleSensor")
-   .label("Sensor")
-   .optionValues((const char*)particleSensorValues)
-   .optionNames((const char*)particleSensorNames)
-   .optionCount(sizeof(particleSensorValues) / STRING_LEN)
-   .nameLength(STRING_LEN)
-   .defaultValue("zh03b")
-   .build();
+    iotwebconf::Builder<iotwebconf::CheckboxTParameter>("particleSensorEnable")
+        .label("Enabled")
+        .defaultValue(true)
+        .build();
+iotwebconf::SelectTParameter<STRING_LEN> particleSensor =
+    iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("particleSensor")
+        .label("Sensor")
+        .optionValues((const char *)particleSensorValues)
+        .optionNames((const char *)particleSensorNames)
+        .optionCount(sizeof(particleSensorValues) / STRING_LEN)
+        .nameLength(STRING_LEN)
+        .defaultValue("zh03b")
+        .build();
 
-static const char vocSensorValues[][STRING_LEN] = { "bme680" };
-static const char vocSensorNames[][STRING_LEN] = { "Bosch BME680" };
+static const char vocSensorValues[][STRING_LEN] = {"bme680"};
+static const char vocSensorNames[][STRING_LEN] = {"Bosch BME680"};
 iotwebconf::ParameterGroup vocSensorGroup = iotwebconf::ParameterGroup("vocSensorGroup", "VOC Sensor");
 iotwebconf::CheckboxTParameter vocSensorEnable =
-  iotwebconf::Builder<iotwebconf::CheckboxTParameter>("vocSensorEnable")
-  .label("Enabled")
-  .defaultValue(true)
-  .build();
-iotwebconf::SelectTParameter<STRING_LEN> vocSensor = 
-iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("vocSensor")
-   .label("Sensor")
-   .optionValues((const char*)vocSensorValues)
-   .optionNames((const char*)vocSensorNames)
-   .optionCount(sizeof(vocSensorValues) / STRING_LEN)
-   .nameLength(STRING_LEN)
-   .defaultValue("zh03b")
-   .build();
+    iotwebconf::Builder<iotwebconf::CheckboxTParameter>("vocSensorEnable")
+        .label("Enabled")
+        .defaultValue(true)
+        .build();
+iotwebconf::SelectTParameter<STRING_LEN> vocSensor =
+    iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("vocSensor")
+        .label("Sensor")
+        .optionValues((const char *)vocSensorValues)
+        .optionNames((const char *)vocSensorNames)
+        .optionCount(sizeof(vocSensorValues) / STRING_LEN)
+        .nameLength(STRING_LEN)
+        .defaultValue("zh03b")
+        .build();
 
 SoftwareSerial ZHSerial(D3, D4); // RX, TX
 AirSensor *airSensor = nullptr;
@@ -162,8 +162,19 @@ void _delay(unsigned long ms)
 void resetAll()
 {
   iotWebConf.getSystemParameterGroup()->applyDefaultValue();
+  iotWebConf.getWifiParameterGroup()->applyDefaultValue();
+  sensorGroup.applyDefaultValue();
+  influxdbGroup.applyDefaultValue();
+  particleSensorGroup.applyDefaultValue();
+  vocSensorGroup.applyDefaultValue();
   iotWebConf.saveConfig();
   ESP.restart();
+}
+
+void hardReset()
+{
+  util::clearEEPROM();
+  ESP.reset();
 }
 
 void renderIndexPage(char *buf)
@@ -230,33 +241,46 @@ void setup()
   iotWebConf.setWifiConnectionTimeoutMs(60000);
 
   iotWebConf.setupUpdateServer(
-    [](const char* updatePath) { httpUpdater.setup(&server, updatePath); },
-    [](const char* userName, char* password) { httpUpdater.updateCredentials(userName, password); });
-  
+      [](const char *updatePath)
+      { httpUpdater.setup(&server, updatePath); },
+      [](const char *userName, char *password)
+      { httpUpdater.updateCredentials(userName, password); });
+
   iotWebConf.init();
 
   server.on("/", handleRoot);
+  server.on("/config", []
+            { iotWebConf.handleConfig(); });
+  server.onNotFound([]()
+                    { iotWebConf.handleNotFound(); });
 
-  server.on("/reset", HTTP_GET, []() {
-    Serial.println("http: serving reset");
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/html", resetPage);
-  });
-  server.on("/reboot", HTTP_POST, []() {
-    Serial.println("http: serving reboot");
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", "rebooting");
-    ESP.restart();
-  });
-  server.on("/reset-confirm", HTTP_POST, []() {
-    Serial.println("http: serving reset confirm");
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", "resetting");
-    resetAll();
-  });
-
-  server.on("/config", [] { iotWebConf.handleConfig(); });
-  server.onNotFound([]() { iotWebConf.handleNotFound(); });
+  server.on("/reset", HTTP_GET, []()
+            {
+              Serial.println("http: serving reset");
+              server.sendHeader("Connection", "close");
+              server.send(200, "text/html", resetPage);
+            });
+  server.on("/reboot", HTTP_POST, []()
+            {
+              Serial.println("http: serving reboot");
+              server.sendHeader("Connection", "close");
+              server.send(200, "text/plain", "rebooting");
+              ESP.restart();
+            });
+  server.on("/reset-confirm", HTTP_POST, []()
+            {
+              Serial.println("http: serving reset confirm");
+              server.sendHeader("Connection", "close");
+              server.send(200, "text/plain", "resetting");
+              resetAll();
+            });
+  server.on("/hard-reset-confirm", HTTP_POST, []()
+            {
+              Serial.println("http: serving hard reset confirm");
+              server.sendHeader("Connection", "close");
+              server.send(200, "text/plain", "resetting");
+              hardReset();
+            });
 
   sprintf(influxdbURL, "http://%s:%d", influxdbHost.value(), influxdbPort.value());
   Serial.printf("setup: influxdb url: %s\n", influxdbURL);
@@ -268,20 +292,23 @@ void setup()
                                                 influxdbDatabase.value());
   reporter = DB;
 
-  if (particleSensorEnable.value()) {
+  if (particleSensorEnable.value())
+  {
     // TODO: support alternate sensors
     ZHSerial.begin(9600);
     ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
     airSensor = ZH;
   }
 
-  if (vocSensorEnable.value()) {
+  if (vocSensorEnable.value())
+  {
     BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
     environmentSensor = BME;
   }
 }
 
-void wifiConnected() {
+void wifiConnected()
+{
   Serial.println("setup: wifi connected");
   ready = true;
 }
@@ -380,13 +407,15 @@ bool sampleParticleSensor(AirData *sample)
 void loop()
 {
   iotWebConf.doLoop();
-  if (!ready) {
+  if (!ready)
+  {
     return;
   }
 
   EnvironmentData envSample;
   bool envSuccess = false;
-  if (environmentSensor) {
+  if (environmentSensor)
+  {
     envSuccess = environmentSensor->getEnvironmentData(&envSample);
     if (envSuccess)
     {
@@ -396,7 +425,8 @@ void loop()
 
   AirData airSample;
   bool airSuccess = false;
-  if (airSensor) {
+  if (airSensor)
+  {
     airSuccess = sampleParticleSensor(&airSample);
     if (airSuccess)
     {
@@ -418,7 +448,8 @@ void loop()
   CalculatedAQI aqi;
   bool aqiSuccess = false;
 
-  if (airSuccess) {
+  if (airSuccess)
+  {
     aqiSuccess = calculateAQI(airSample, &aqi);
   }
 

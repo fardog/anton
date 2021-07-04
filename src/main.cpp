@@ -140,9 +140,9 @@ iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("vocSensor")
    .build();
 
 SoftwareSerial ZHSerial(D3, D4); // RX, TX
-AirSensor *sensor = nullptr;
+AirSensor *airSensor = nullptr;
 Reporter *reporter = nullptr;
-EnvironmentSensor *environment;
+EnvironmentSensor *environmentSensor;
 
 void _delay(unsigned long ms)
 {
@@ -228,6 +228,10 @@ void setup()
 
   iotWebConf.setWifiConnectionCallback(&wifiConnected);
   iotWebConf.setWifiConnectionTimeoutMs(60000);
+
+  iotWebConf.setupUpdateServer(
+    [](const char* updatePath) { httpUpdater.setup(&server, updatePath); },
+    [](const char* userName, char* password) { httpUpdater.updateCredentials(userName, password); });
   
   iotWebConf.init();
 
@@ -268,12 +272,12 @@ void setup()
     // TODO: support alternate sensors
     ZHSerial.begin(9600);
     ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
-    sensor = ZH;
+    airSensor = ZH;
   }
 
   if (vocSensorEnable.value()) {
     BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
-    environment = BME;
+    environmentSensor = BME;
   }
 }
 
@@ -296,10 +300,10 @@ uint16_t medianValue(uint16_t *values, int count)
   return values[(count / 2) - 1];
 }
 
-bool sampleSensor(AirData *sample)
+bool sampleParticleSensor(AirData *sample)
 {
   // wake sensor
-  if (sensor->wake())
+  if (airSensor->wake())
   {
     Serial.println("loop: sensor wakeup successful");
     wakeupFailCounter = 0;
@@ -331,7 +335,7 @@ bool sampleSensor(AirData *sample)
   AirData buf;
   for (int i = 0; i < NUM_SAMPLES; i++)
   {
-    if (sensor->getAirData(&buf))
+    if (airSensor->getAirData(&buf))
     {
       if (buf.p1_0 == buf.p2_5 && buf.p2_5 == buf.p10_0 && buf.p1_0 > 500)
       {
@@ -351,7 +355,7 @@ bool sampleSensor(AirData *sample)
   }
 
   // shut down sensor, stopping its fan.
-  if (sensor->sleep())
+  if (airSensor->sleep())
   {
     Serial.println("loop: sensor sleep successful");
   }
@@ -382,25 +386,25 @@ void loop()
 
   EnvironmentData envSample;
   bool envSuccess = false;
-  if (environment) {
-    envSuccess = environment->getEnvironmentData(&envSample);
+  if (environmentSensor) {
+    envSuccess = environmentSensor->getEnvironmentData(&envSample);
     if (envSuccess)
     {
       lastEnvironmentData = envSample;
     }
   }
 
-  AirData sample;
-  bool success = false;
-  if (sensor) {
-    success = sampleSensor(&sample);
-    if (success)
+  AirData airSample;
+  bool airSuccess = false;
+  if (airSensor) {
+    airSuccess = sampleParticleSensor(&airSample);
+    if (airSuccess)
     {
       Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
-                    sample.p1_0,
-                    sample.p2_5,
-                    sample.p10_0);
-      lastAirData = sample;
+                    airSample.p1_0,
+                    airSample.p2_5,
+                    airSample.p10_0);
+      lastAirData = airSample;
       lastMeasured = millis();
       strcpy(lastStatus, "SUCCESS");
     }
@@ -412,13 +416,13 @@ void loop()
   }
 
   CalculatedAQI aqi;
-  bool aqi_success = false;
+  bool aqiSuccess = false;
 
-  if (success) {
-    aqi_success = calculateAQI(sample, &aqi);
+  if (airSuccess) {
+    aqiSuccess = calculateAQI(airSample, &aqi);
   }
 
-  if (reporter->report(success ? &sample : nullptr, aqi_success ? &aqi : nullptr, envSuccess ? &envSample : nullptr))
+  if (reporter->report(airSuccess ? &airSample : nullptr, aqiSuccess ? &aqi : nullptr, envSuccess ? &envSample : nullptr))
   {
     Serial.println("loop: sample submitted successfully");
   }
@@ -428,7 +432,7 @@ void loop()
     Serial.println(reporter->getLastErrorMessage());
   }
 
-  if (aqi_success)
+  if (aqiSuccess)
   {
     lastAQI = aqi.value;
     strcpy(lastPrimaryContributor, aqi.pollutant);

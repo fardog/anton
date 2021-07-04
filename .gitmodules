@@ -13,3 +13,6 @@
 [submodule "lib/BME680"]
 	path = lib/BME680
 	url = git@github.com:SV-Zanshin/BME680.git
+[submodule "lib/PMS"]
+	path = lib/PMS
+	url = git@github.com:fu-hsi/PMS.git

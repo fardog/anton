@@ -27,7 +27,7 @@
 #define GIT_REV "Unknown"
 #endif
 
-#define CONFIG_VERSION "v2"
+#define CONFIG_VERSION "v2.1"
 #define PRODUCT_NAME "anton"
 #define DEFAULT_PASSWORD "anton-system"
 
@@ -105,6 +105,8 @@ iotwebconf::TextTParameter<STRING_LEN> influxdbDatabase =
 
 static const char particleSensorValues[][STRING_LEN] = {"zh03b"};
 static const char particleSensorNames[][STRING_LEN] = {"Winsen ZH03B"};
+static const char particleSensorRXValues[][4] = {"D1", "D3"};
+static const char particleSensorTXValues[][4] = {"D2", "D4"};
 iotwebconf::ParameterGroup particleSensorGroup = iotwebconf::ParameterGroup("particleSensorGroup", "Particulate Sensor");
 iotwebconf::CheckboxTParameter particleSensorEnable =
     iotwebconf::Builder<iotwebconf::CheckboxTParameter>("particleSensorEnable")
@@ -119,6 +121,24 @@ iotwebconf::SelectTParameter<STRING_LEN> particleSensor =
         .optionCount(sizeof(particleSensorValues) / STRING_LEN)
         .nameLength(STRING_LEN)
         .defaultValue("zh03b")
+        .build();
+iotwebconf::SelectTParameter<4> particleSensorRX =
+    iotwebconf::Builder<iotwebconf::SelectTParameter<4>>("particleSensorRX")
+        .label("RX Pin")
+        .optionValues((const char *)particleSensorRXValues)
+        .optionNames((const char *)particleSensorRXValues)
+        .optionCount(sizeof(particleSensorRXValues) / 4)
+        .nameLength(4)
+        .defaultValue("D3")
+        .build();
+iotwebconf::SelectTParameter<4> particleSensorTX =
+    iotwebconf::Builder<iotwebconf::SelectTParameter<4>>("particleSensorTX")
+        .label("TX Pin")
+        .optionValues((const char *)particleSensorTXValues)
+        .optionNames((const char *)particleSensorTXValues)
+        .optionCount(sizeof(particleSensorTXValues) / 4)
+        .nameLength(4)
+        .defaultValue("D4")
         .build();
 
 static const char vocSensorValues[][STRING_LEN] = {"bme680"};
@@ -139,7 +159,7 @@ iotwebconf::SelectTParameter<STRING_LEN> vocSensor =
         .defaultValue("zh03b")
         .build();
 
-SoftwareSerial ZHSerial(D3, D4); // RX, TX
+SoftwareSerial *airSensorSerial;
 AirSensor *airSensor = nullptr;
 Reporter *reporter = nullptr;
 EnvironmentSensor *environmentSensor;
@@ -231,6 +251,8 @@ void setup()
 
   particleSensorGroup.addItem(&particleSensorEnable);
   particleSensorGroup.addItem(&particleSensor);
+  particleSensorGroup.addItem(&particleSensorRX);
+  particleSensorGroup.addItem(&particleSensorTX);
   iotWebConf.addParameterGroup(&particleSensorGroup);
 
   vocSensorGroup.addItem(&vocSensorEnable);
@@ -294,9 +316,11 @@ void setup()
 
   if (particleSensorEnable.value())
   {
-    // TODO: support alternate sensors
-    ZHSerial.begin(9600);
-    ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
+    airSensorSerial = new SoftwareSerial(
+        strcmp(particleSensorRX.value(), "D1") ? D1 : D3,
+        strcmp(particleSensorTX.value(), "D2") ? D2 : D4);
+    airSensorSerial->begin(9600);
+    ZH03B_AirSensor *ZH = new ZH03B_AirSensor(*airSensorSerial);
     airSensor = ZH;
   }
 

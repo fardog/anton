@@ -3,7 +3,16 @@
 #include <SoftwareSerial.h>
 
 #include <AQI.h>
+
 #include <IotWebConf.h>
+#include <IotWebConfTParameter.h>
+
+#ifdef ESP8266
+  #include <ESP8266HTTPUpdateServer.h>
+#elif defined(ESP32)
+  // For ESP32 IotWebConf provides a drop-in replacement for UpdateServer.
+  #include <IotWebConfESP32HTTPUpdateServer.h>
+#endif
 
 #include "strings.h"
 
@@ -19,17 +28,11 @@
 #define GIT_REV "Unknown"
 #endif
 
-#define CONFIG_VERSION "v1"
+#define CONFIG_VERSION "v2"
 #define PRODUCT_NAME "anton"
 #define DEFAULT_PASSWORD "anton-system"
 
-char sensor_name[40] = "anton-default";
-char sensor_location[40] = "";
-char influxdb_server[100] = "influxdb";
-char influxdb_port[6] = "8086";
-char influxdb_database[40] = "anton";
-bool zh03b_enabled = true;
-bool bme680_enabled = true;
+#define STRING_LEN 128
 
 char influxdb_url[200] = "";
 
@@ -59,35 +62,83 @@ void wifiConnected();
 
 DNSServer dnsServer;
 WebServer server(80);
-HTTPUpdateServer httpUpdater;
+
+#ifdef ESP8266
+  ESP8266HTTPUpdateServer httpUpdater;
+#elif defined(ESP32)
+  HTTPUpdateServer httpUpdater;
+#endif
 
 IotWebConf iotWebConf(PRODUCT_NAME, &dnsServer, &server, DEFAULT_PASSWORD, CONFIG_VERSION);
 
-IotWebConfParameter sensorNameParam = IotWebConfParameter(
-    "Sensor Name",
-    "barton",
-    sensor_name,
-    40);
-IotWebConfParameter sensorLocationParam = IotWebConfParameter(
-    "Location",
-    "location",
-    sensor_location,
-    40);
-IotWebConfParameter influxDbServerParam = IotWebConfParameter(
-    "InfluxDB Server Host",
-    "influxDbHost",
-    influxdb_server,
-    100);
-IotWebConfParameter influxDbPortParam = IotWebConfParameter(
-    "InfluxDB Port",
-    "8086",
-    influxdb_port,
-    6);
-IotWebConfParameter influxDbDatabaseParam = IotWebConfParameter(
-    "InfluxDB Database",
-    "anton",
-    influxdb_database,
-    40);
+iotwebconf::ParameterGroup sensorGroup = iotwebconf::ParameterGroup("sensorGroup", "");
+iotwebconf::TextTParameter<STRING_LEN> sensorName =
+  iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("sensorName")
+  .label("Sensor Name")
+  .defaultValue("anton-default")
+  .build();
+iotwebconf::TextTParameter<STRING_LEN> sensorLocation =
+  iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("sensorLocation")
+  .label("Sensor Location")
+  .defaultValue("")
+  .build();
+
+iotwebconf::ParameterGroup influxdbGroup = iotwebconf::ParameterGroup("influxdbGroup", "InfluxDB");
+iotwebconf::TextTParameter<STRING_LEN> influxdbHost =
+  iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("influxdbHost")
+  .label("Host")
+  .defaultValue("influxdb")
+  .build();
+iotwebconf::IntTParameter<uint16_t> influxdbPort =
+  iotwebconf::Builder<iotwebconf::IntTParameter<uint16_t>>("influxdbPort")
+  .label("Port")
+  .defaultValue(8086)
+  .min(1)
+  .max(65535)
+  .step(1)
+  .placeholder("8086")
+  .build();
+iotwebconf::TextTParameter<STRING_LEN> influxdbDatabase =
+  iotwebconf::Builder<iotwebconf::TextTParameter<STRING_LEN>>("influxdbDatabase")
+  .label("Database Name")
+  .defaultValue("anton")
+  .build();
+
+static const char particleSensorValues[][STRING_LEN] = { "zh03b" };
+static const char particleSensorNames[][STRING_LEN] = { "Winsen ZH03B" };
+iotwebconf::ParameterGroup particleSensorGroup = iotwebconf::ParameterGroup("particleSensorGroup", "Particulate Sensor");
+iotwebconf::CheckboxTParameter particleSensorEnable =
+  iotwebconf::Builder<iotwebconf::CheckboxTParameter>("particleSensorEnable")
+  .label("Enabled")
+  .defaultValue(true)
+  .build();
+iotwebconf::SelectTParameter<STRING_LEN> particleSensor = 
+iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("particleSensor")
+   .label("Sensor")
+   .optionValues((const char*)particleSensorValues)
+   .optionNames((const char*)particleSensorNames)
+   .optionCount(sizeof(particleSensorValues) / STRING_LEN)
+   .nameLength(STRING_LEN)
+   .defaultValue("zh03b")
+   .build();
+
+static const char vocSensorValues[][STRING_LEN] = { "bme680" };
+static const char vocSensorNames[][STRING_LEN] = { "Bosch BME680" };
+iotwebconf::ParameterGroup vocSensorGroup = iotwebconf::ParameterGroup("vocSensorGroup", "VOC Sensor");
+iotwebconf::CheckboxTParameter vocSensorEnable =
+  iotwebconf::Builder<iotwebconf::CheckboxTParameter>("vocSensorEnable")
+  .label("Enabled")
+  .defaultValue(true)
+  .build();
+iotwebconf::SelectTParameter<STRING_LEN> vocSensor = 
+iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("vocSensor")
+   .label("Sensor")
+   .optionValues((const char*)vocSensorValues)
+   .optionNames((const char*)vocSensorNames)
+   .optionCount(sizeof(vocSensorValues) / STRING_LEN)
+   .nameLength(STRING_LEN)
+   .defaultValue("zh03b")
+   .build();
 
 SoftwareSerial ZHSerial(D3, D4); // RX, TX
 AirSensor *sensor = nullptr;
@@ -134,7 +185,7 @@ void render_index_page(char *buf)
       last_aqi,
       last_primary_contributor,
       millis() / 1000,
-      sensor_name,
+      sensorName.value(),
       influxdb_url,
       GIT_REV);
 }
@@ -166,15 +217,28 @@ void setup()
   Serial.begin(9600);
   Serial.printf("setup: starting version %s\n", GIT_REV);
 
-  iotWebConf.addParameter(&sensorNameParam);
-  iotWebConf.addParameter(&sensorLocationParam);
-  iotWebConf.addParameter(&influxDbServerParam);
-  iotWebConf.addParameter(&influxDbPortParam);
-  iotWebConf.addParameter(&influxDbDatabaseParam);
+  sensorGroup.addItem(&sensorName);
+  sensorGroup.addItem(&sensorLocation);
+  iotWebConf.addParameterGroup(&sensorGroup);
+
+  influxdbGroup.addItem(&influxdbHost);
+  influxdbGroup.addItem(&influxdbPort);
+  influxdbGroup.addItem(&influxdbDatabase);
+  iotWebConf.addParameterGroup(&influxdbGroup);
+
+  particleSensorGroup.addItem(&particleSensorEnable);
+  particleSensorGroup.addItem(&particleSensor);
+  iotWebConf.addParameterGroup(&particleSensorGroup);
+
+  vocSensorGroup.addItem(&vocSensorEnable);
+  vocSensorGroup.addItem(&vocSensor);
+  iotWebConf.addParameterGroup(&vocSensorGroup);
 
   iotWebConf.setWifiConnectionCallback(&wifiConnected);
   iotWebConf.getApTimeoutParameter()->visible = true;
-  iotWebConf.setupUpdateServer(&httpUpdater);
+  iotWebConf.setupUpdateServer(
+      [](const char* updatePath) { httpUpdater.setup(&server, updatePath); },
+      [](const char* userName, char* password) { httpUpdater.updateCredentials(userName, password); });
 
   iotWebConf.init();
 
@@ -201,24 +265,24 @@ void setup()
   server.on("/config", [] { iotWebConf.handleConfig(); });
   server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
-  sprintf(influxdb_url, "http://%s:%s", influxdb_server, influxdb_port);
+  sprintf(influxdb_url, "http://%s:%d", influxdbHost.value(), influxdbPort.value());
   Serial.printf("setup: influxdb url: %s\n", influxdb_url);
 
   // set up reporter
-  InfluxDB_Reporter *DB = new InfluxDB_Reporter(sensor_name,
-                                                sensor_location,
+  InfluxDB_Reporter *DB = new InfluxDB_Reporter(sensorName.value(),
+                                                sensorLocation.value(),
                                                 influxdb_url,
-                                                influxdb_database);
+                                                influxdbDatabase.value());
   reporter = DB;
 
-  if (zh03b_enabled) {
-    // set up ZH03B sensor
+  if (particleSensorEnable.value()) {
+    // TODO: support alternate sensors
     ZHSerial.begin(9600);
     ZH03B_AirSensor *ZH = new ZH03B_AirSensor(ZHSerial);
     sensor = ZH;
   }
 
-  if (bme680_enabled) {
+  if (vocSensorEnable.value()) {
     BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
     environment = BME;
   }
@@ -390,6 +454,7 @@ void loop()
   else
   {
     Serial.println("loop: failed to submit sample");
+    Serial.println(reporter->getLastErrorMessage());
   }
 
   if (aqi_success)

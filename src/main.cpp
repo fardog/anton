@@ -435,7 +435,17 @@ void loop()
     envSuccess = environmentSensor->getEnvironmentData(&envSample);
     if (envSuccess)
     {
+      Serial.printf("Environment: %.2f°C, %.2f%%rh, IAQ %.2f, %.2fhPa, %.2fOhm\n",
+                    envSample.tempC,
+                    envSample.humPct,
+                    envSample.iaq,
+                    envSample.pressure,
+                    envSample.gasResistance);
       lastEnvironmentData = envSample;
+    }
+    else
+    {
+      Serial.println("loop: failed to sample environment sensor");
     }
   }
 
@@ -446,7 +456,7 @@ void loop()
     airSuccess = sampleParticleSensor(&airSample);
     if (airSuccess)
     {
-      Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
+      Serial.printf("Particulate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
                     airSample.p1_0,
                     airSample.p2_5,
                     airSample.p10_0);
@@ -456,7 +466,7 @@ void loop()
     }
     else
     {
-      Serial.println("loop: failed to sample sensor");
+      Serial.println("loop: failed to sample particulate sensor");
       strcpy(lastStatus, "FAILURE");
     }
   }
@@ -475,8 +485,7 @@ void loop()
   }
   else
   {
-    Serial.println("loop: failed to submit sample");
-    Serial.println(reporter->getLastErrorMessage());
+    Serial.printf("loop: failed to submit sample, reason: %s\n", reporter->getLastErrorMessage().c_str());
   }
 
   if (aqiSuccess)

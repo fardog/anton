@@ -105,8 +105,8 @@ iotwebconf::TextTParameter<STRING_LEN> influxdbDatabase =
 
 static const char particleSensorValues[][STRING_LEN] = {"zh03b"};
 static const char particleSensorNames[][STRING_LEN] = {"Winsen ZH03B"};
-static const char particleSensorRXValues[][4] = {"D1", "D3"};
-static const char particleSensorTXValues[][4] = {"D2", "D4"};
+static const char particleSensorRXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
+static const char particleSensorTXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
 iotwebconf::ParameterGroup particleSensorGroup = iotwebconf::ParameterGroup("particleSensorGroup", "Particulate Sensor");
 iotwebconf::CheckboxTParameter particleSensorEnable =
     iotwebconf::Builder<iotwebconf::CheckboxTParameter>("particleSensorEnable")
@@ -209,11 +209,14 @@ void renderIndexPage(char *buf)
       serverIndex,
       last,
       lastStatus,
+      lastAirData.p1_0,
+      lastAirData.p2_5,
+      lastAirData.p10_0,
+      lastAQI,
+      lastPrimaryContributor,
       util::rnd(lastEnvironmentData.tempC),
       util::rnd(lastEnvironmentData.humPct),
       util::rnd(lastEnvironmentData.iaq),
-      lastAQI,
-      lastPrimaryContributor,
       millis() / 1000,
       sensorName.value(),
       influxdbURL,
@@ -316,9 +319,11 @@ void setup()
 
   if (particleSensorEnable.value())
   {
-    airSensorSerial = new SoftwareSerial(
-        strcmp(particleSensorRX.value(), "D1") ? D3 : D1,
-        strcmp(particleSensorTX.value(), "D2") ? D4 : D2);
+    int8_t rx = util::stringToPin(particleSensorRX.value());
+    int8_t tx = util::stringToPin(particleSensorTX.value());
+    Serial.printf("setup: starting ZH03B particle sensor on serial: %s(%d), %s(%d)\n",
+                  particleSensorRX.value(), rx, particleSensorTX.value(), tx);
+    airSensorSerial = new SoftwareSerial(rx, tx);
     airSensorSerial->begin(9600);
     ZH03B_AirSensor *ZH = new ZH03B_AirSensor(*airSensorSerial);
     airSensor = ZH;
@@ -326,6 +331,7 @@ void setup()
 
   if (vocSensorEnable.value())
   {
+    Serial.println("setup: starting BME680 VOC sensor on I2C (default pins)");
     BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
     environmentSensor = BME;
   }
@@ -335,20 +341,6 @@ void wifiConnected()
 {
   Serial.println("setup: wifi connected");
   ready = true;
-}
-
-int sortUint16Desc(const void *cmp1, const void *cmp2)
-{
-  uint16_t a = *((uint16_t *)cmp1);
-  uint16_t b = *((uint16_t *)cmp2);
-  return b - a;
-}
-
-uint16_t medianValue(uint16_t *values, int count)
-{
-  qsort(values, count, sizeof(values[0]), sortUint16Desc);
-
-  return values[(count / 2) - 1];
 }
 
 bool sampleParticleSensor(AirData *sample)
@@ -361,7 +353,7 @@ bool sampleParticleSensor(AirData *sample)
   }
   else if (wakeupFailCounter >= MAX_SENSOR_WAKE_FAIL)
   {
-    Serial.printf("loop: ERROR failed to wake sensor %d times; resetting", wakeupFailCounter);
+    Serial.printf("loop: ERROR failed to wake sensor %d times; resetting\n", wakeupFailCounter);
     ESP.restart();
     return false;
   }
@@ -421,9 +413,9 @@ bool sampleParticleSensor(AirData *sample)
     return false;
   }
 
-  sample->p1_0 = medianValue(pm1_0, successes);
-  sample->p2_5 = medianValue(pm2_5, successes);
-  sample->p10_0 = medianValue(pm10_0, successes);
+  sample->p1_0 = util::medianValue(pm1_0, successes);
+  sample->p2_5 = util::medianValue(pm2_5, successes);
+  sample->p10_0 = util::medianValue(pm10_0, successes);
 
   return true;
 }
@@ -443,7 +435,17 @@ void loop()
     envSuccess = environmentSensor->getEnvironmentData(&envSample);
     if (envSuccess)
     {
+      Serial.printf("Environment: %.2f°C, %.2f%%rh, IAQ %.2f, %.2fhPa, %.2fOhm\n",
+                    envSample.tempC,
+                    envSample.humPct,
+                    envSample.iaq,
+                    envSample.pressure,
+                    envSample.gasResistance);
       lastEnvironmentData = envSample;
+    }
+    else
+    {
+      Serial.println("loop: failed to sample environment sensor");
     }
   }
 
@@ -454,7 +456,7 @@ void loop()
     airSuccess = sampleParticleSensor(&airSample);
     if (airSuccess)
     {
-      Serial.printf("Aggregate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
+      Serial.printf("Particulate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
                     airSample.p1_0,
                     airSample.p2_5,
                     airSample.p10_0);
@@ -464,7 +466,7 @@ void loop()
     }
     else
     {
-      Serial.println("loop: failed to sample sensor");
+      Serial.println("loop: failed to sample particulate sensor");
       strcpy(lastStatus, "FAILURE");
     }
   }
@@ -483,8 +485,7 @@ void loop()
   }
   else
   {
-    Serial.println("loop: failed to submit sample");
-    Serial.println(reporter->getLastErrorMessage());
+    Serial.printf("loop: failed to submit sample, reason: %s\n", reporter->getLastErrorMessage().c_str());
   }
 
   if (aqiSuccess)

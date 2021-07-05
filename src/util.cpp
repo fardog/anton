@@ -1,5 +1,11 @@
 #include <EEPROM.h>
 
+#ifdef ESP8266
+#include <SoftwareSerial.h>
+#elif defined(ESP32)
+#include <HardwareSerial.h>
+#endif
+
 #include "util.h"
 
 int util::rnd(float val)
@@ -18,6 +24,7 @@ void util::clearEEPROM()
     EEPROM.commit();
 }
 
+#ifdef ESP8266
 int8_t util::stringToPin(char *s)
 {
     if (strcmp(s, "D1") == 0)
@@ -63,6 +70,45 @@ int8_t util::stringToPin(char *s)
 
     return -1;
 }
+
+Stream *util::getSerial(char *rx, char *tx)
+{
+    int8_t rxPin = stringToPin(rx);
+    int8_t txPin = stringToPin(tx);
+
+    SoftwareSerial *serial = new SoftwareSerial(rxPin, txPin);
+    serial->begin(9600);
+    return serial;
+}
+#elif defined(ESP32)
+int8_t util::stringToUart(char *s)
+{
+    if (strcmp(s, "U0") == 0)
+    {
+        return 0;
+    }
+    if (strcmp(s, "U1") == 0)
+    {
+        return 1;
+    }
+    if (strcmp(s, "U2") == 0)
+    {
+        return 2;
+    }
+
+    return -1;
+}
+
+Stream *util::getSerial(char *uart)
+{
+    int8_t uartNo = stringToUart(uart);
+
+    HardwareSerial *serial = new HardwareSerial(uartNo);
+    serial->begin(9600);
+
+    return serial;
+}
+#endif
 
 int util::sortUint16Desc(const void *cmp1, const void *cmp2)
 {

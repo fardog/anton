@@ -16,8 +16,8 @@ Hardware:
 * NodeMCUv3 or similar ESP8266-based system
 * A particulate sensor, one of:
   * [ZH03B][]
-  * [PMS7003][]; other PMS series sensors may be supported, but have not been
-    tested.
+  * [PMS7003][]; **Untested**, but should work. Might support other PMS-series
+    sensors as well.
 * (Optional) A multisensor:
   * [BME680][] sensor and breakout board; configured for i2c
 

@@ -1,7 +1,7 @@
 # anton
 
-A quick and dirty air sensor, using the [ZH03B][] particulate matter sensor.
-Submits data directly to an [InfluxDB][] v1 instance, without auth.
+A quick and dirty air sensor which submits data directly to an [InfluxDB][]
+v1 instance, without auth.
 
 I built this because the west coast is on fire, and I ran out of [Luftdaten][]
 sensor parts. It's not pretty or full featured but it works.
@@ -14,10 +14,15 @@ sensor parts. It's not pretty or full featured but it works.
 Hardware:
 
 * NodeMCUv3 or similar ESP8266-based system
-* [ZH03B][] particulate matter sensor
-* [BME680][] sensor and breakout board; configured for i2c
+* A particulate sensor, one of:
+  * [ZH03B][]
+  * [PMS7003][]; other PMS series sensors may be supported, but have not been
+    tested.
+* (Optional) A multisensor:
+  * [BME680][] sensor and breakout board; configured for i2c
 
 [ZH03B]: https://www.winsen-sensor.com/sensors/dust-sensor/zh3b.html
+[PMS7003]: http://www.plantower.com/en/content/?110.html
 [BME680]: https://www.bosch-sensortec.com/products/environmental-sensors/gas-sensors-bme680/
 
 Software:
@@ -31,14 +36,22 @@ Wire the ZH03B as follows:
 * Pin4: `D3`
 * Pin5: `D4`
 
-Wire the BME680 as follows:
+Or the PMS7003 as follows:
+
+* Pin1: `VU`
+* Pin3: `Ground`
+* Pin7: `D3`
+* Pin9: `D4`
+
+(Optional) Wire the BME680 as follows:
 
 * VCC: `3v3`
 * GND: `Ground`
 * SCL: `D1`
 * SDA: `D2`
 
-A 3D printable case for Anton is available at [PrusaPrinters][].
+A 3D printable case for Anton is available at [PrusaPrinters][]. **Note:** the
+case fits the ZH03B; one that supports the PMS7003 is in progress.
 
 [PrusaPrinters]: https://www.prusaprinters.org/prints/40746-case-for-anton-air-quality-influxdb
 
@@ -50,7 +63,7 @@ This is built using [PlatformIO][]; refer to their docs on building/uploading.
 
 ## Setup
 
-Once uploaded and booted, a wireless network called `anton-setup` will be
+Once uploaded and booted, a wireless network called `anton` will be
 created; join this network and you will be directed to a captive portal for
 configuration.
 
@@ -67,12 +80,25 @@ Measurements are submitted to the configured database as a measurement named
 * `p1_0` PM1.0
 * `p2_5` PM2.5
 * `p10_0` PM10
-* `aqi` EPA AQI
+* `aqi` EPA [AQI][]
+
+[AQI]: https://www.airnow.gov/aqi/aqi-basics/
 
 …and the following string values:
 
 * `aqi_contributor` the primary AQI contributor (highest value); the string will
-  match the measurement name, e.g. `p1_0`
+  match the measurement name, e.g. `p2_5`
+
+If you have the optional multisensor connected, the following additional integer
+fields will be sent:
+
+* `temperature` °C
+* `humidity` %rh
+* `pressure` hPa
+* `gas_resistance` Ohm
+* `iaq` EPA [IAQ][].
+
+[IAQ]: https://www.epa.gov/indoor-air-quality-iaq/introduction-indoor-air-quality
 
 **Note:** currently only PM10 and PM2.5 are accounted for in AQI measurements,
 following the EPA standard.
@@ -109,10 +135,13 @@ version numbers yet. For now, changes will be listed by date.
 
 ## Acknowledgements
 
-This was very quick to implement due to
-[this excellent library](https://github.com/ShaggyDog18/SD_ZH03B) by
-[@ShaggyDog18](https://github.com/ShaggyDog18/). Thanks tons.
+This was quick to implement due to the following excellent libraries:
 
+* [@ShaggyDog18/SD_ZH03B](https://github.com/ShaggyDog18/SD_ZH03B)
+* [@tobiasschuerg/InfluxDB-Client-for-Arduino](https://github.com/tobiasschuerg/InfluxDB-Client-for-Arduino)
+* [@prampec/IotWebConf](https://github.com/prampec/IotWebConf)
+* [@SV-Zanshin/BME680](https://github.com/SV-Zanshin/BME680)
+* [@fu-hsi/PMS](https://github.com/fu-hsi/PMS)
 
 ## License
 

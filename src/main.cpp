@@ -107,7 +107,7 @@ static const char particleSensorValues[][STRING_LEN] = {"zh03b", "pms7003"};
 static const char particleSensorNames[][STRING_LEN] = {"Winsen ZH03B", "Plantower PMS7003"};
 #ifdef ESP8266
 static const char particleSensorRXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
-static const char particleSensorRXNames[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
+static const char particleSensorRXNames[][STRING_LEN] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
 static const char particleSensorTXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
 #elif defined(ESP32)
 static const char particleSensorRXValues[][4] = {"U0", "U1", "U2"};
@@ -121,7 +121,7 @@ iotwebconf::ParameterGroup particleSensorGroup = iotwebconf::ParameterGroup("par
 iotwebconf::CheckboxTParameter particleSensorEnable =
     iotwebconf::Builder<iotwebconf::CheckboxTParameter>("particleSensorEnable")
         .label("Enabled")
-        .defaultValue(true)
+        .defaultValue(false)
         .build();
 iotwebconf::SelectTParameter<STRING_LEN> particleSensor =
     iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("particleSensor")
@@ -142,8 +142,12 @@ iotwebconf::SelectTParameter<4> particleSensorRX =
         .optionValues((const char *)particleSensorRXValues)
         .optionNames((const char *)particleSensorRXNames)
         .optionCount(sizeof(particleSensorRXValues) / 4)
-        .nameLength(4)
+        .nameLength(STRING_LEN)
+#ifdef ESP8266
         .defaultValue("D3")
+#elif defined(ESP32)
+        .defaultValue("U2")
+#endif
         .build();
 iotwebconf::SelectTParameter<4> particleSensorTX =
     iotwebconf::Builder<iotwebconf::SelectTParameter<4>>("particleSensorTX")
@@ -152,7 +156,11 @@ iotwebconf::SelectTParameter<4> particleSensorTX =
         .optionNames((const char *)particleSensorTXValues)
         .optionCount(sizeof(particleSensorTXValues) / 4)
         .nameLength(4)
+#ifdef ESP8266
         .defaultValue("D4")
+#elif defined(ESP32)
+        .defaultValue("--")
+#endif
         .build();
 
 static const char vocSensorValues[][STRING_LEN] = {"bme680"};
@@ -161,7 +169,7 @@ iotwebconf::ParameterGroup vocSensorGroup = iotwebconf::ParameterGroup("vocSenso
 iotwebconf::CheckboxTParameter vocSensorEnable =
     iotwebconf::Builder<iotwebconf::CheckboxTParameter>("vocSensorEnable")
         .label("Enabled")
-        .defaultValue(true)
+        .defaultValue(false)
         .build();
 iotwebconf::SelectTParameter<STRING_LEN> vocSensor =
     iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("vocSensor")
@@ -399,7 +407,7 @@ bool sampleParticleSensor(AirData *sample)
   // wait for a period before actually sampling it.
   _delay(SENSOR_STARTUP_DELAY);
 
-  Serial.println("sensor: attemping average sample");
+  Serial.println("sensor: attemping aggregate sample");
   uint16_t pm1_0[NUM_SAMPLES];
   uint16_t pm2_5[NUM_SAMPLES];
   uint16_t pm10_0[NUM_SAMPLES];

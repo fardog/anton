@@ -19,6 +19,7 @@
 #include "reporters/InfluxDB_Reporter.h"
 #include "sensors/AirSensor.h"
 #include "sensors/ZH03B_AirSensor.h"
+#include "sensors/PMS_AirSensor.h"
 #include "sensors/EnvironmentSensor.h"
 #include "sensors/BME680_EnvironmentSensor.h"
 #include "util.h"
@@ -103,8 +104,8 @@ iotwebconf::TextTParameter<STRING_LEN> influxdbDatabase =
         .defaultValue("anton")
         .build();
 
-static const char particleSensorValues[][STRING_LEN] = {"zh03b"};
-static const char particleSensorNames[][STRING_LEN] = {"Winsen ZH03B"};
+static const char particleSensorValues[][STRING_LEN] = {"zh03b", "pms7003"};
+static const char particleSensorNames[][STRING_LEN] = {"Winsen ZH03B", "Plantower PMS7003"};
 static const char particleSensorRXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
 static const char particleSensorTXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
 iotwebconf::ParameterGroup particleSensorGroup = iotwebconf::ParameterGroup("particleSensorGroup", "Particulate Sensor");
@@ -321,12 +322,27 @@ void setup()
   {
     int8_t rx = util::stringToPin(particleSensorRX.value());
     int8_t tx = util::stringToPin(particleSensorTX.value());
-    Serial.printf("setup: starting ZH03B particle sensor on serial: %s(%d), %s(%d)\n",
-                  particleSensorRX.value(), rx, particleSensorTX.value(), tx);
     airSensorSerial = new SoftwareSerial(rx, tx);
     airSensorSerial->begin(9600);
-    ZH03B_AirSensor *ZH = new ZH03B_AirSensor(*airSensorSerial);
-    airSensor = ZH;
+
+    if (strcmp(particleSensor.value(), "zh03b") == 0)
+    {
+      Serial.printf("setup: starting ZH03B particle sensor on serial: %s(%d), %s(%d)\n",
+                    particleSensorRX.value(), rx, particleSensorTX.value(), tx);
+      ZH03B_AirSensor *ZH = new ZH03B_AirSensor(*airSensorSerial);
+      airSensor = ZH;
+    }
+    else if (strcmp(particleSensor.value(), "pms7003") == 0)
+    {
+      Serial.printf("setup: starting PMS7003 particle sensor on serial: %s(%d), %s(%d)\n",
+                    particleSensorRX.value(), rx, particleSensorTX.value(), tx);
+      PMS_AirSensor *PMS = new PMS_AirSensor(*airSensorSerial);
+      airSensor = PMS;
+    }
+    else
+    {
+      Serial.printf("setup: invalid particle sensor type: %s\n", particleSensor.value());
+    }
   }
 
   if (vocSensorEnable.value())

@@ -36,8 +36,8 @@ Wire the ZH03B as follows:
 * Pin1: `VU`
 * Pin2: `Ground`
 * ESP8266
-  * Pin4: `D3`
-  * Pin5: `D4`
+  * Pin4: `D4`
+  * Pin5: `D3`
 * ESP32
   * Pin4: `TX2` (`GPIO17`)
   * Pin5: `RX2` (`GPIO16`)

@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <SoftwareSerial.h>
 
 #include <AQI.h>
 
@@ -106,13 +105,23 @@ iotwebconf::TextTParameter<STRING_LEN> influxdbDatabase =
 
 static const char particleSensorValues[][STRING_LEN] = {"zh03b", "pms7003"};
 static const char particleSensorNames[][STRING_LEN] = {"Winsen ZH03B", "Plantower PMS7003"};
+#ifdef ESP8266
 static const char particleSensorRXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
+static const char particleSensorRXNames[][STRING_LEN] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
 static const char particleSensorTXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
+#elif defined(ESP32)
+static const char particleSensorRXValues[][4] = {"U0", "U1", "U2"};
+static const char particleSensorRXNames[][STRING_LEN] = {
+    "UART0(rx:GPIO3,tx:GPIO1)",
+    "UART1(rx:GPIO9,tx:GPIO10)",
+    "UART2(rx:GPIO16,tx:GPIO17)"};
+static const char particleSensorTXValues[][4] = {"--"};
+#endif
 iotwebconf::ParameterGroup particleSensorGroup = iotwebconf::ParameterGroup("particleSensorGroup", "Particulate Sensor");
 iotwebconf::CheckboxTParameter particleSensorEnable =
     iotwebconf::Builder<iotwebconf::CheckboxTParameter>("particleSensorEnable")
         .label("Enabled")
-        .defaultValue(true)
+        .defaultValue(false)
         .build();
 iotwebconf::SelectTParameter<STRING_LEN> particleSensor =
     iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("particleSensor")
@@ -125,12 +134,20 @@ iotwebconf::SelectTParameter<STRING_LEN> particleSensor =
         .build();
 iotwebconf::SelectTParameter<4> particleSensorRX =
     iotwebconf::Builder<iotwebconf::SelectTParameter<4>>("particleSensorRX")
+#ifdef ESP8266
         .label("RX Pin")
+#elif defined(ESP32)
+        .label("UART")
+#endif
         .optionValues((const char *)particleSensorRXValues)
-        .optionNames((const char *)particleSensorRXValues)
+        .optionNames((const char *)particleSensorRXNames)
         .optionCount(sizeof(particleSensorRXValues) / 4)
-        .nameLength(4)
+        .nameLength(STRING_LEN)
+#ifdef ESP8266
         .defaultValue("D3")
+#elif defined(ESP32)
+        .defaultValue("U2")
+#endif
         .build();
 iotwebconf::SelectTParameter<4> particleSensorTX =
     iotwebconf::Builder<iotwebconf::SelectTParameter<4>>("particleSensorTX")
@@ -139,7 +156,11 @@ iotwebconf::SelectTParameter<4> particleSensorTX =
         .optionNames((const char *)particleSensorTXValues)
         .optionCount(sizeof(particleSensorTXValues) / 4)
         .nameLength(4)
+#ifdef ESP8266
         .defaultValue("D4")
+#elif defined(ESP32)
+        .defaultValue("--")
+#endif
         .build();
 
 static const char vocSensorValues[][STRING_LEN] = {"bme680"};
@@ -148,7 +169,7 @@ iotwebconf::ParameterGroup vocSensorGroup = iotwebconf::ParameterGroup("vocSenso
 iotwebconf::CheckboxTParameter vocSensorEnable =
     iotwebconf::Builder<iotwebconf::CheckboxTParameter>("vocSensorEnable")
         .label("Enabled")
-        .defaultValue(true)
+        .defaultValue(false)
         .build();
 iotwebconf::SelectTParameter<STRING_LEN> vocSensor =
     iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("vocSensor")
@@ -160,7 +181,7 @@ iotwebconf::SelectTParameter<STRING_LEN> vocSensor =
         .defaultValue("zh03b")
         .build();
 
-SoftwareSerial *airSensorSerial;
+Stream *airSensorSerial;
 AirSensor *airSensor = nullptr;
 Reporter *reporter = nullptr;
 EnvironmentSensor *environmentSensor;
@@ -195,7 +216,7 @@ void resetAll()
 void hardReset()
 {
   util::clearEEPROM();
-  ESP.reset();
+  ESP.restart();
 }
 
 void renderIndexPage(char *buf)
@@ -320,22 +341,23 @@ void setup()
 
   if (particleSensorEnable.value())
   {
-    int8_t rx = util::stringToPin(particleSensorRX.value());
-    int8_t tx = util::stringToPin(particleSensorTX.value());
-    airSensorSerial = new SoftwareSerial(rx, tx);
-    airSensorSerial->begin(9600);
+#ifdef ESP8266
+    airSensorSerial = util::getSerial(particleSensorRX.value(), particleSensorTX.value());
+#elif defined(ESP32)
+    airSensorSerial = util::getSerial(particleSensorRX.value());
+#endif
 
     if (strcmp(particleSensor.value(), "zh03b") == 0)
     {
-      Serial.printf("setup: starting ZH03B particle sensor on serial: %s(%d), %s(%d)\n",
-                    particleSensorRX.value(), rx, particleSensorTX.value(), tx);
+      Serial.printf("setup: starting ZH03B particle sensor on serial: %s, %s\n",
+                    particleSensorRX.value(), particleSensorTX.value());
       ZH03B_AirSensor *ZH = new ZH03B_AirSensor(*airSensorSerial);
       airSensor = ZH;
     }
     else if (strcmp(particleSensor.value(), "pms7003") == 0)
     {
-      Serial.printf("setup: starting PMS7003 particle sensor on serial: %s(%d), %s(%d)\n",
-                    particleSensorRX.value(), rx, particleSensorTX.value(), tx);
+      Serial.printf("setup: starting PMS7003 particle sensor on serial: %s, %s\n",
+                    particleSensorRX.value(), particleSensorTX.value());
       PMS_AirSensor *PMS = new PMS_AirSensor(*airSensorSerial);
       airSensor = PMS;
     }
@@ -385,7 +407,7 @@ bool sampleParticleSensor(AirData *sample)
   // wait for a period before actually sampling it.
   _delay(SENSOR_STARTUP_DELAY);
 
-  Serial.println("sensor: attemping average sample");
+  Serial.println("sensor: attemping aggregate sample");
   uint16_t pm1_0[NUM_SAMPLES];
   uint16_t pm2_5[NUM_SAMPLES];
   uint16_t pm10_0[NUM_SAMPLES];

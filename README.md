@@ -13,7 +13,9 @@ sensor parts. It's not pretty or full featured but it works.
 
 Hardware:
 
-* NodeMCUv3 or similar ESP8266-based system
+* An ESP development board for ESP8266 or ESP32, such as:
+  * NodeMCUv3 or similar ESP8266 platform
+  * Lolin32 or similar ESP32 platform
 * A particulate sensor, one of:
   * [ZH03B][]
   * [PMS7003][]; **Untested**, but should work. Might support other PMS-series
@@ -33,25 +35,38 @@ Wire the ZH03B as follows:
 
 * Pin1: `VU`
 * Pin2: `Ground`
-* Pin4: `D3`
-* Pin5: `D4`
+* ESP8266
+  * Pin4: `D4`
+  * Pin5: `D3`
+* ESP32
+  * Pin4: `TX2` (`GPIO17`)
+  * Pin5: `RX2` (`GPIO16`)
 
 Or the PMS7003 as follows:
 
 * Pin1: `VU`
 * Pin3: `Ground`
-* Pin7: `D3`
-* Pin9: `D4`
+* ESP8266
+  * Pin7: `D3`
+  * Pin9: `D4`
+* ESP32
+  * Pin7: `TX2` (`GPIO17`)
+  * Pin9: `RX2` (`GPIO16`)
 
 (Optional) Wire the BME680 as follows:
 
 * VCC: `3v3`
 * GND: `Ground`
-* SCL: `D1`
-* SDA: `D2`
+* ESP8266
+  * SCL: `D1`
+  * SDA: `D2`
+* ESP32
+  * SCL: `SCL` (`GPIO22`)
+  * SDA: `SDA` (`GPIO21`)
 
 A 3D printable case for Anton is available at [PrusaPrinters][]. **Note:** the
-case fits the ZH03B; one that supports the PMS7003 is in progress.
+case fits the ZH03B and ESP8266; for PMS7003 or ESP32, you're on your own right
+now, but I'll make one in the future.
 
 [PrusaPrinters]: https://www.prusaprinters.org/prints/40746-case-for-anton-air-quality-influxdb
 

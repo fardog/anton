@@ -2,7 +2,6 @@
 #define ZH03b_AirSensor_h
 
 #include <SD_ZH03B.h>
-#include <SoftwareSerial.h>
 
 #include "AirSensor.h"
 

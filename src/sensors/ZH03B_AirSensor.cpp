@@ -10,7 +10,6 @@ ZH03B_AirSensor::~ZH03B_AirSensor() {}
 
 bool ZH03B_AirSensor::getAirData(AirData *data)
 {
-    Serial.println("sensor: sampling");
     if (_sensor.readData())
     {
         data->p1_0 = _sensor.getPM1_0();
@@ -21,7 +20,6 @@ bool ZH03B_AirSensor::getAirData(AirData *data)
     }
     else
     {
-        Serial.println("sensor: Error reading stream or Check Sum Error");
         return false;
     }
 }

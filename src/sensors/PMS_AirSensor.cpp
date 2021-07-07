@@ -5,7 +5,6 @@ PMS_AirSensor::~PMS_AirSensor() {}
 
 bool PMS_AirSensor::getAirData(AirData *data)
 {
-	Serial.println("sensor: sampling");
 	bool success = _sensor.read(_buf);
 	if (!success)
 	{

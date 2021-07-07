@@ -2,7 +2,6 @@
 #define PMS_AirSensor_h
 
 #include <PMS.h>
-#include <SoftwareSerial.h>
 
 #include "AirSensor.h"
 

@@ -5,7 +5,7 @@ PMS_AirSensor::~PMS_AirSensor() {}
 
 bool PMS_AirSensor::getAirData(AirData *data)
 {
-	bool success = _sensor.read(_buf);
+	bool success = _sensor.readUntil(_buf);
 	if (!success)
 	{
 		return false;

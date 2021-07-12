@@ -18,8 +18,8 @@ Hardware:
   * Lolin32 or similar ESP32 platform
 * A particulate sensor, one of:
   * [ZH03B][]
-  * [PMS7003][]; **Untested**, but should work. Might support other PMS-series
-    sensors as well.
+  * [PMS7003][]; Only the PMS7003 has been tested, but other PMSX003 sensors may
+    work.
 * (Optional) A multisensor:
   * [BME680][] sensor and breakout board; configured for i2c
 

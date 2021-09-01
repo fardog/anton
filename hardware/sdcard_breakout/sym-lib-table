@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name molex_1051620001)(type Legacy)(uri ${KIPRJMOD}/molex_1051620001/2021-09-01_00-33-57.lib)(options "")(descr ""))
+)

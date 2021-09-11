@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name pms7003_breakout)(type KiCad)(uri ${KIPRJMOD}/pms7003_breakout.pretty)(options "")(descr ""))
+)

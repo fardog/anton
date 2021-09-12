@@ -16,3 +16,6 @@
 [submodule "lib/PMS"]
 	path = lib/PMS
 	url = git@github.com:fu-hsi/PMS.git
+[submodule "lib/TaskScheduler"]
+	path = lib/TaskScheduler
+	url = git@github.com:arkhipenko/TaskScheduler.git

@@ -22,8 +22,9 @@ class AirSensor
 {
 public:
     virtual bool getAirData(AirData *data) = 0;
-    virtual bool wake() = 0;
+    virtual void loop() = 0;
     virtual bool sleep() = 0;
+    virtual bool wake() = 0;
 };
 
 #endif

@@ -12,8 +12,9 @@ public:
     ~ZH03B_AirSensor();
 
     bool getAirData(AirData *data);
-    bool wake();
+    void loop();
     bool sleep();
+    bool wake();
 
 private:
     SD_ZH03B _sensor;

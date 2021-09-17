@@ -3,7 +3,6 @@
 ZH03B_AirSensor::ZH03B_AirSensor(Stream &serial, bool debug) : _sensor(SD_ZH03B(serial)), _debug(debug)
 {
     _sensor.setMode(SD_ZH03B::IU_MODE);
-    sleep();
 }
 
 ZH03B_AirSensor::~ZH03B_AirSensor() {}
@@ -24,12 +23,14 @@ bool ZH03B_AirSensor::getAirData(AirData *data)
     }
 }
 
-bool ZH03B_AirSensor::wake()
-{
-    return _sensor.wakeup();
-}
+void ZH03B_AirSensor::loop() {}
 
 bool ZH03B_AirSensor::sleep()
 {
     return _sensor.sleep();
+}
+
+bool ZH03B_AirSensor::wake()
+{
+    return _sensor.wakeup();
 }

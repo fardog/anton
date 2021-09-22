@@ -1,18 +1,22 @@
 #include <Arduino.h>
 #include "Anton.h"
 
-Anton::Anton(Reporter *reporter, AirSensor *airSensor, EnvironmentSensor *environmentSensor)
+Anton::Anton(Reporter *reporter,
+             AirSensor *airSensor,
+             EnvironmentSensor *environmentSensor,
+             uint16_t timeBetweenMeasurements)
     : _reporter(reporter),
       _airSensor(airSensor),
       _environmentSensor(environmentSensor),
       _states{
-          {StateId::STARTUP, 0, StateId::WAKE_SENSORS},
-          {StateId::WAKE_SENSORS, 0, StateId::WARM_UP},
-          {StateId::WARM_UP, 10000, StateId::SAMPLE},
-          {StateId::SAMPLE, 0, StateId::SLEEP_SENSORS},
-          {StateId::SLEEP_SENSORS, 0, StateId::REPORT},
-          {StateId::REPORT, 0, StateId::SLEEP},
-          {StateId::SLEEP, 30000, StateId::WAKE_SENSORS},
+          {StateId::STARTUP, 0, 0, StateId::WAKE_SENSORS},
+          {StateId::WAKE_SENSORS, 0, 0, StateId::WARM_UP},
+          {StateId::WARM_UP, 10000, 0, StateId::SAMPLE_PARTICULATE},
+          {StateId::SAMPLE_PARTICULATE, 0, 30000, StateId::SAMPLE_MISC},
+          {StateId::SAMPLE_MISC, 0, 10000, StateId::SLEEP_SENSORS},
+          {StateId::SLEEP_SENSORS, 0, 10000, StateId::REPORT},
+          {StateId::REPORT, 0, 30000, StateId::SLEEP},
+          {StateId::SLEEP, timeBetweenMeasurements, 0, StateId::WAKE_SENSORS},
       }
 {
   _state = _states[0];
@@ -22,7 +26,16 @@ Anton::~Anton() {}
 
 void Anton::loop()
 {
-  if (millis() < _delayUntil)
+  unsigned long now = millis();
+
+  if (_state.timeout > 0 && now > _lastTransition + _state.timeout)
+  {
+    Serial.printf("state %d timed out; moving to next state\n", _state.state);
+    _nextState();
+    return;
+  }
+
+  if (now < _stateStart)
   {
     return;
   }
@@ -38,9 +51,11 @@ void Anton::loop()
   case WARM_UP:
     _warmUp();
     break;
-  case SAMPLE:
-    _sample();
+  case SAMPLE_PARTICULATE:
+    _sampleParticulate();
     break;
+  case SAMPLE_MISC:
+    _sampleMisc();
   case SLEEP_SENSORS:
     _sleepSensors();
     break;
@@ -55,9 +70,16 @@ void Anton::loop()
 
 void Anton::_nextState()
 {
-  Serial.printf("state change: %d -> %d\n", _state.state, _state.next);
-  _delayUntil = millis() + _state.delay;
+  Serial.printf("state change: %d -> %d, delaying %dms\n", _state.state, _state.next, _state.delay);
+  _stateStart = millis() + _state.delay;
+  _lastTransition = _stateStart;
   _state = _states[_state.next];
+}
+
+void Anton::_retry(uint16_t delay)
+{
+  Serial.printf("retrying state %d, delaying %dms\n", _state.state, delay);
+  _stateStart = millis() + delay;
 }
 
 void Anton::_startup()
@@ -89,27 +111,46 @@ void Anton::_warmUp()
   _nextState();
 }
 
-void Anton::_sample()
+void Anton::_sampleParticulate()
 {
   if (_airSensor)
   {
     _airSensor->loop();
-    AirData airSample;
-    if (_airSensor->getAirData(&airSample))
+    if (_airSensor->getAirData(&_airData))
     {
       Serial.printf("Particulate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
-                    airSample.p1_0,
-                    airSample.p2_5,
-                    airSample.p10_0);
-      // lastAirData = airSample;
-      // lastMeasured = millis();
-      // strcpy(lastStatus, "SUCCESS");
+                    _airData.p1_0,
+                    _airData.p2_5,
+                    _airData.p10_0);
 
       _nextState();
     }
   }
   else
   {
+    _nextState();
+  }
+}
+
+void Anton::_sampleMisc()
+{
+  if (_environmentSensor)
+  {
+    _environmentSensor->loop();
+    if (_environmentSensor->getEnvironmentData(&_environmentData))
+    {
+      Serial.printf("Environment: %.2f°C, %.2f%%rh, IAQ %.2f, %.2fhPa, %.2fOhm\n",
+                    _environmentData.tempC,
+                    _environmentData.humPct,
+                    _environmentData.iaq,
+                    _environmentData.pressure,
+                    _environmentData.gasResistance);
+      _nextState();
+    }
+  }
+  else
+  {
+
     _nextState();
   }
 }
@@ -130,6 +171,36 @@ void Anton::_sleepSensors()
 
 void Anton::_report()
 {
+  AirData *ad = nullptr;
+  EnvironmentData *ed = nullptr;
+  CalculatedAQI *aqi = nullptr;
+
+  if (_airSensor)
+  {
+    ad = &_airData;
+    aqi = new CalculatedAQI;
+    if (!calculateAQI(_airData, aqi))
+    {
+      delete aqi;
+      aqi = nullptr;
+    }
+  }
+
+  if (_environmentSensor)
+  {
+    ed = &_environmentData;
+  }
+
+  if (!_reporter->report(ad, aqi, ed))
+  {
+    Serial.printf("failed to report: %s\n", _reporter->getLastErrorMessage().c_str());
+    delete aqi;
+    _retry(3000);
+    return;
+  }
+
+  delete aqi;
+
   _nextState();
 }
 

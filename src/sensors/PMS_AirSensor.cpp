@@ -14,6 +14,7 @@ bool PMS_AirSensor::getAirData(AirData *data)
 	data->p1_0 = util::medianValue(p1_0, PMS_NUM_SAMPLES);
 	data->p2_5 = util::medianValue(p2_5, PMS_NUM_SAMPLES);
 	data->p10_0 = util::medianValue(p10_0, PMS_NUM_SAMPLES);
+	data->timestamp = millis();
 
 	_ready = false;
 

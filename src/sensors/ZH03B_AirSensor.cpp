@@ -14,6 +14,7 @@ bool ZH03B_AirSensor::getAirData(AirData *data)
         data->p1_0 = _sensor.getPM1_0();
         data->p2_5 = _sensor.getPM2_5();
         data->p10_0 = _sensor.getPM10_0();
+        data->timestamp = millis();
 
         return true;
     }

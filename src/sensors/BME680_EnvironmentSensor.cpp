@@ -30,3 +30,8 @@ bool BME680_EnvironmentSensor::getEnvironmentData(EnvironmentData *data)
 
     return true;
 }
+
+void BME680_EnvironmentSensor::loop()
+{
+
+}

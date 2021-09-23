@@ -14,6 +14,7 @@
 
 #include "strings.h"
 
+#include "Anton.h"
 #include "reporters/Reporter.h"
 #include "reporters/InfluxDB_Reporter.h"
 #include "sensors/AirSensor.h"
@@ -32,26 +33,6 @@
 #define DEFAULT_PASSWORD "anton-system"
 
 #define STRING_LEN 128
-
-// global variables
-bool ready = false;
-int wakeupFailCounter = 0;
-int lastMeasured = 0;
-AirData lastAirData;
-EnvironmentData lastEnvironmentData;
-char lastStatus[10] = "NONE";
-int lastAQI = 0;
-char lastPrimaryContributor[5] = "NONE";
-
-// constants
-static const int NUM_SAMPLES = 10;
-static const int MIN_SAMPLES_FOR_SUCCESS = 4;
-static const int SENSOR_STARTUP_DELAY = 10000;
-static const int SAMPLE_DELAY = 3000;
-static const int MEASUREMENT_DELAY = 60000;
-static const int MAX_JSON_DOCUMENT_SIZE = 2048;
-static const int MAX_SENSOR_WAKE_FAIL = 5;
-static const int MAX_CONNECTION_FAIL = 5;
 
 // constants initialized at setup
 char influxdbURL[200] = "";
@@ -185,10 +166,16 @@ Stream *airSensorSerial;
 AirSensor *airSensor = nullptr;
 Reporter *reporter = nullptr;
 EnvironmentSensor *environmentSensor;
+Anton *anton;
 
-void _delay(unsigned long ms)
+void _delay(unsigned long ms, const char *msg = nullptr)
 {
   const int now = millis();
+
+  if (msg)
+  {
+    Serial.println(msg);
+  }
 
   while (1)
   {
@@ -219,26 +206,44 @@ void hardReset()
   ESP.restart();
 }
 
-void renderIndexPage(char *buf)
+void renderIndexPage(char *buf, Anton *anton)
 {
-  int last = -1;
-  if (lastMeasured > 0)
+  AirData ad = anton->airData();
+  EnvironmentData ed = anton->environmentData();
+  CalculatedAQI aqi = anton->aqi();
+
+  int lastMeasured = -1;
+  if (ad.timestamp > 0)
   {
-    last = (millis() - lastMeasured) / 1000;
+    lastMeasured = (millis() - ad.timestamp) / 1000;
   }
+
+  int reported = -1;
+  if (anton->lastReported() > 0)
+  {
+    reported = (millis() - anton->lastReported()) / 1000;
+  }
+
+  String lastStatus = anton->lastErrorMessage();
+  if (lastStatus.equals(""))
+  {
+    lastStatus = "SUCCESS";
+  }
+
   sprintf(
       buf,
       serverIndex,
-      last,
-      lastStatus,
-      lastAirData.p1_0,
-      lastAirData.p2_5,
-      lastAirData.p10_0,
-      lastAQI,
-      lastPrimaryContributor,
-      util::rnd(lastEnvironmentData.tempC),
-      util::rnd(lastEnvironmentData.humPct),
-      util::rnd(lastEnvironmentData.iaq),
+      lastMeasured,
+      reported,
+      lastStatus.c_str(),
+      ad.p1_0,
+      ad.p2_5,
+      ad.p10_0,
+      util::rnd(aqi.value),
+      aqi.pollutant,
+      util::rnd(ed.tempC),
+      util::rnd(ed.humPct),
+      util::rnd(ed.iaq),
       millis() / 1000,
       sensorName.value(),
       influxdbURL,
@@ -254,10 +259,16 @@ void handleRoot()
     return;
   }
 
-  char buf[2048];
-  renderIndexPage(buf);
-
-  server.send(200, "text/html", buf);
+  if (anton)
+  {
+    char buf[2048];
+    renderIndexPage(buf, anton);
+    server.send(200, "text/html", buf);
+  }
+  else
+  {
+    server.send(200, "text/html", serverUnconfigured);
+  }
 }
 
 void setup()
@@ -373,169 +384,17 @@ void setup()
     BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
     environmentSensor = BME;
   }
+
+  anton = new Anton(reporter, airSensor, environmentSensor);
 }
 
 void wifiConnected()
 {
   Serial.println("setup: wifi connected");
-  ready = true;
-}
-
-bool sampleParticleSensor(AirData *sample)
-{
-  // wake sensor
-  if (airSensor->wake())
-  {
-    Serial.println("loop: sensor wakeup successful");
-    wakeupFailCounter = 0;
-  }
-  else if (wakeupFailCounter >= MAX_SENSOR_WAKE_FAIL)
-  {
-    Serial.printf("loop: ERROR failed to wake sensor %d times; resetting\n", wakeupFailCounter);
-    ESP.restart();
-    return false;
-  }
-  else
-  {
-    Serial.println("loop: ERROR failed to wake the sensor; delaying and trying again");
-    wakeupFailCounter += 1;
-    _delay(30000);
-    return false;
-  }
-
-  // delay after sensor start; waking the sensor starts its fan, and we want to
-  // wait for a period before actually sampling it.
-  _delay(SENSOR_STARTUP_DELAY);
-
-  Serial.println("sensor: attemping aggregate sample");
-  uint16_t pm1_0[NUM_SAMPLES];
-  uint16_t pm2_5[NUM_SAMPLES];
-  uint16_t pm10_0[NUM_SAMPLES];
-  int successes = 0;
-
-  AirData buf;
-  for (int i = 0; i < NUM_SAMPLES; i++)
-  {
-    if (airSensor->getAirData(&buf))
-    {
-      if (buf.p1_0 == buf.p2_5 && buf.p2_5 == buf.p10_0 && buf.p1_0 > 500)
-      {
-        Serial.println("sensor: faulty measurement, all values are equal and very large. discarding");
-      }
-      else
-      {
-        pm1_0[successes] = buf.p1_0;
-        pm2_5[successes] = buf.p2_5;
-        pm10_0[successes] = buf.p10_0;
-        successes++;
-
-        Serial.printf("sensor: sample PM1.0, PM2.5, PM10=[%d, %d, %d]\n", buf.p1_0, buf.p2_5, buf.p10_0);
-      }
-    }
-    _delay(SAMPLE_DELAY);
-  }
-
-  // shut down sensor, stopping its fan.
-  if (airSensor->sleep())
-  {
-    Serial.println("loop: sensor sleep successful");
-  }
-  else
-  {
-    Serial.println("loop: ERROR failed to sleep the sensor");
-  }
-
-  if (successes < MIN_SAMPLES_FOR_SUCCESS)
-  {
-    Serial.println("sensor: failed to get minimum number of samples");
-    return false;
-  }
-
-  sample->p1_0 = util::medianValue(pm1_0, successes);
-  sample->p2_5 = util::medianValue(pm2_5, successes);
-  sample->p10_0 = util::medianValue(pm10_0, successes);
-
-  return true;
 }
 
 void loop()
 {
   iotWebConf.doLoop();
-  if (!ready)
-  {
-    return;
-  }
-
-  EnvironmentData envSample;
-  bool envSuccess = false;
-  if (environmentSensor)
-  {
-    envSuccess = environmentSensor->getEnvironmentData(&envSample);
-    if (envSuccess)
-    {
-      Serial.printf("Environment: %.2f°C, %.2f%%rh, IAQ %.2f, %.2fhPa, %.2fOhm\n",
-                    envSample.tempC,
-                    envSample.humPct,
-                    envSample.iaq,
-                    envSample.pressure,
-                    envSample.gasResistance);
-      lastEnvironmentData = envSample;
-    }
-    else
-    {
-      Serial.println("loop: failed to sample environment sensor");
-    }
-  }
-
-  AirData airSample;
-  bool airSuccess = false;
-  if (airSensor)
-  {
-    airSuccess = sampleParticleSensor(&airSample);
-    if (airSuccess)
-    {
-      Serial.printf("Particulate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
-                    airSample.p1_0,
-                    airSample.p2_5,
-                    airSample.p10_0);
-      lastAirData = airSample;
-      lastMeasured = millis();
-      strcpy(lastStatus, "SUCCESS");
-    }
-    else
-    {
-      Serial.println("loop: failed to sample particulate sensor");
-      strcpy(lastStatus, "FAILURE");
-    }
-  }
-
-  CalculatedAQI aqi;
-  bool aqiSuccess = false;
-
-  if (airSuccess)
-  {
-    aqiSuccess = calculateAQI(airSample, &aqi);
-  }
-
-  if (reporter->report(airSuccess ? &airSample : nullptr, aqiSuccess ? &aqi : nullptr, envSuccess ? &envSample : nullptr))
-  {
-    Serial.println("loop: sample submitted successfully");
-  }
-  else
-  {
-    Serial.printf("loop: failed to submit sample, reason: %s\n", reporter->getLastErrorMessage().c_str());
-  }
-
-  if (aqiSuccess)
-  {
-    lastAQI = aqi.value;
-    strcpy(lastPrimaryContributor, aqi.pollutant);
-  }
-  else
-  {
-    lastAQI = -1;
-    strcpy(lastPrimaryContributor, "NONE");
-  }
-
-  _delay(MEASUREMENT_DELAY);
+  anton->loop();
 }

@@ -16,6 +16,7 @@ class EnvironmentSensor
 {
 public:
     virtual bool getEnvironmentData(EnvironmentData *data) = 0;
+    virtual void loop() = 0;
 };
 
 #endif

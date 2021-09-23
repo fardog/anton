@@ -9,6 +9,12 @@ sensor parts. It's not pretty or full featured but it works.
 [InfluxDB]: https://docs.influxdata.com/influxdb/v1.8/
 [Luftdaten]: https://sensor.community/
 
+**Note:** the current `master` branch will not be optimal if you are using the
+ZH03B particulate sensor. If you are, it's recommended you use the [tagged
+v1.0.0 release][v1.0.0].
+
+[v1.0.0]: https://github.com/fardog/anton/releases/tag/v1.0.0
+
 ## Requirements
 
 Hardware:

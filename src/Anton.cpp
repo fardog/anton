@@ -178,11 +178,9 @@ void Anton::_report()
   if (_airSensor)
   {
     ad = &_airData;
-    aqi = new CalculatedAQI;
-    if (!calculateAQI(_airData, aqi))
+    if (calculateAQI(_airData, &_aqi))
     {
-      delete aqi;
-      aqi = nullptr;
+      aqi = &_aqi;
     }
   }
 
@@ -191,17 +189,19 @@ void Anton::_report()
     ed = &_environmentData;
   }
 
-  if (!_reporter->report(ad, aqi, ed))
+  if (_reporter->report(ad, aqi, ed))
   {
-    Serial.printf("failed to report: %s\n", _reporter->getLastErrorMessage().c_str());
-    delete aqi;
-    _retry(3000);
+    _lastErrorMessage = "";
+    _lastReported = millis();
+
+    _nextState();
+
     return;
   }
 
-  delete aqi;
-
-  _nextState();
+  _lastErrorMessage = _reporter->getLastErrorMessage();
+  Serial.printf("failed to report: %s\n", _lastErrorMessage.c_str());
+  _retry(3000);
 }
 
 void Anton::_sleep()

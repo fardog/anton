@@ -5,7 +5,7 @@ const char *serverIndex = R"(
 <html>
   <body>
     <h1>Particulate Sensor</h1>
-    Measured %d seconds ago; last result was %s.
+    Measured %d seconds ago, reported %d seconds ago; last result was %s.
     <dl>
       <dt>PM1.0</dt>
       <dd>%d</dd>
@@ -54,6 +54,16 @@ const char *serverIndex = R"(
       <hr>
       anton: revision %s
     </footer>
+  </body>
+</html>
+)";
+
+const char *serverUnconfigured = R"(
+<!DOCTYPE html>
+<html>
+  <body>
+    <h1>Unconfigured</h1>
+    Visit the <a href="/config">config page</a> to perform configuration.
   </body>
 </html>
 )";

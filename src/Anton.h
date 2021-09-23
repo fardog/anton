@@ -40,6 +40,9 @@ public:
   void loop();
   AirData airData() { return _airData; }
   EnvironmentData environmentData() { return _environmentData; }
+  CalculatedAQI aqi() { return _aqi; }
+  unsigned long lastReported() { return _lastReported; }
+  String lastErrorMessage() { return _lastErrorMessage; }
 
 private:
   Reporter *_reporter;
@@ -64,8 +67,11 @@ private:
 
   unsigned long _stateStart = 0;
   unsigned long _lastTransition = 0;
+  unsigned long _lastReported = 0;
   AirData _airData;
   EnvironmentData _environmentData;
+  CalculatedAQI _aqi;
+  String _lastErrorMessage;
 };
 
 #endif

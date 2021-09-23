@@ -34,21 +34,6 @@
 
 #define STRING_LEN 128
 
-// global variables
-bool ready = false;
-int wakeupFailCounter = 0;
-int lastMeasured = 0;
-AirData lastAirData;
-EnvironmentData lastEnvironmentData;
-char lastStatus[10] = "NONE";
-int lastAQI = 0;
-char lastPrimaryContributor[5] = "NONE";
-
-// constants
-static const int SENSOR_STARTUP_DELAY = 10000;
-static const int SAMPLE_DELAY = 3000;
-static const int MEASUREMENT_DELAY = 60000;
-
 // constants initialized at setup
 char influxdbURL[200] = "";
 
@@ -221,26 +206,44 @@ void hardReset()
   ESP.restart();
 }
 
-void renderIndexPage(char *buf)
+void renderIndexPage(char *buf, Anton *anton)
 {
-  int last = -1;
-  if (lastMeasured > 0)
+  AirData ad = anton->airData();
+  EnvironmentData ed = anton->environmentData();
+  CalculatedAQI aqi = anton->aqi();
+
+  int lastMeasured = -1;
+  if (ad.timestamp > 0)
   {
-    last = (millis() - lastMeasured) / 1000;
+    lastMeasured = (millis() - ad.timestamp) / 1000;
   }
+
+  int reported = -1;
+  if (anton->lastReported() > 0)
+  {
+    reported = (millis() - anton->lastReported()) / 1000;
+  }
+
+  String lastStatus = anton->lastErrorMessage();
+  if (lastStatus.equals(""))
+  {
+    lastStatus = "SUCCESS";
+  }
+
   sprintf(
       buf,
       serverIndex,
-      last,
-      lastStatus,
-      lastAirData.p1_0,
-      lastAirData.p2_5,
-      lastAirData.p10_0,
-      lastAQI,
-      lastPrimaryContributor,
-      util::rnd(lastEnvironmentData.tempC),
-      util::rnd(lastEnvironmentData.humPct),
-      util::rnd(lastEnvironmentData.iaq),
+      lastMeasured,
+      reported,
+      lastStatus.c_str(),
+      ad.p1_0,
+      ad.p2_5,
+      ad.p10_0,
+      aqi.value,
+      aqi.pollutant,
+      util::rnd(ed.tempC),
+      util::rnd(ed.humPct),
+      util::rnd(ed.iaq),
       millis() / 1000,
       sensorName.value(),
       influxdbURL,
@@ -256,10 +259,16 @@ void handleRoot()
     return;
   }
 
-  char buf[2048];
-  renderIndexPage(buf);
-
-  server.send(200, "text/html", buf);
+  if (anton)
+  {
+    char buf[2048];
+    renderIndexPage(buf, anton);
+    server.send(200, "text/html", buf);
+  }
+  else
+  {
+    server.send(200, "text/html", serverUnconfigured);
+  }
 }
 
 void setup()
@@ -382,60 +391,10 @@ void setup()
 void wifiConnected()
 {
   Serial.println("setup: wifi connected");
-  ready = true;
 }
 
 void loop()
 {
   iotWebConf.doLoop();
   anton->loop();
-
-  // EnvironmentData envSample;
-  // bool envSuccess = false;
-  // if (environmentSensor)
-  // {
-  //   envSuccess = environmentSensor->getEnvironmentData(&envSample);
-  //   if (envSuccess)
-  //   {
-  //     Serial.printf("Environment: %.2f°C, %.2f%%rh, IAQ %.2f, %.2fhPa, %.2fOhm\n",
-  //                   envSample.tempC,
-  //                   envSample.humPct,
-  //                   envSample.iaq,
-  //                   envSample.pressure,
-  //                   envSample.gasResistance);
-  //     lastEnvironmentData = envSample;
-  //   }
-  //   else
-  //   {
-  //     Serial.println("loop: failed to sample environment sensor");
-  //   }
-  // }
-
-  // CalculatedAQI aqi;
-  // bool aqiSuccess = false;
-
-  // if (airSuccess)
-  // {
-  //   aqiSuccess = calculateAQI(airSample, &aqi);
-  // }
-
-  // if (reporter->report(airSuccess ? &airSample : nullptr, aqiSuccess ? &aqi : nullptr, envSuccess ? &envSample : nullptr))
-  // {
-  //   Serial.println("loop: sample submitted successfully");
-  // }
-  // else
-  // {
-  //   Serial.printf("loop: failed to submit sample, reason: %s\n", reporter->getLastErrorMessage().c_str());
-  // }
-
-  // if (aqiSuccess)
-  // {
-  //   lastAQI = aqi.value;
-  //   strcpy(lastPrimaryContributor, aqi.pollutant);
-  // }
-  // else
-  // {
-  //   lastAQI = -1;
-  //   strcpy(lastPrimaryContributor, "NONE");
-  // }
 }

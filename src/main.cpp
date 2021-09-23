@@ -239,7 +239,7 @@ void renderIndexPage(char *buf, Anton *anton)
       ad.p1_0,
       ad.p2_5,
       ad.p10_0,
-      aqi.value,
+      util::rnd(aqi.value),
       aqi.pollutant,
       util::rnd(ed.tempC),
       util::rnd(ed.humPct),

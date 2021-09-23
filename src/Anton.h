@@ -65,13 +65,13 @@ private:
   void _nextState();
   void _retry(uint16_t delay);
 
-  unsigned long _stateStart = 0;
-  unsigned long _lastTransition = 0;
-  unsigned long _lastReported = 0;
-  AirData _airData;
-  EnvironmentData _environmentData;
-  CalculatedAQI _aqi;
-  String _lastErrorMessage;
+  unsigned long _stateStart{0};
+  unsigned long _lastTransition{0};
+  unsigned long _lastReported{0};
+  AirData _airData{};
+  EnvironmentData _environmentData{};
+  CalculatedAQI _aqi{};
+  String _lastErrorMessage{""};
 };
 
 #endif

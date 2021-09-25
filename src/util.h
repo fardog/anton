@@ -11,11 +11,11 @@ namespace util
     uint16_t medianValue(uint16_t *values, int count);
 
 #ifdef ESP8266
-    int8_t stringToPin(char *s);
-    Stream *getSerial(char *rx, char *tx);
+    int8_t stringToPin(const char *s);
+    Stream *getSerial(const char *rx, const char *tx);
 #elif defined(ESP32)
-    int8_t stringToUart(char *s);
-    Stream *getSerial(char *uart);
+    int8_t stringToUart(const char *s);
+    Stream *getSerial(const char *uart);
 #endif
 } // namespace util
 

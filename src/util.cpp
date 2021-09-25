@@ -25,7 +25,7 @@ void util::clearEEPROM()
 }
 
 #ifdef ESP8266
-int8_t util::stringToPin(char *s)
+int8_t util::stringToPin(const char *s)
 {
     if (strcmp(s, "D1") == 0)
     {
@@ -71,7 +71,7 @@ int8_t util::stringToPin(char *s)
     return -1;
 }
 
-Stream *util::getSerial(char *rx, char *tx)
+Stream *util::getSerial(const char *rx, const char *tx)
 {
     int8_t rxPin = stringToPin(rx);
     int8_t txPin = stringToPin(tx);
@@ -81,7 +81,7 @@ Stream *util::getSerial(char *rx, char *tx)
     return serial;
 }
 #elif defined(ESP32)
-int8_t util::stringToUart(char *s)
+int8_t util::stringToUart(const char *s)
 {
     if (strcmp(s, "U0") == 0)
     {
@@ -99,7 +99,7 @@ int8_t util::stringToUart(char *s)
     return -1;
 }
 
-Stream *util::getSerial(char *uart)
+Stream *util::getSerial(const char *uart)
 {
     int8_t uartNo = stringToUart(uart);
 

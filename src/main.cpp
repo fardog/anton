@@ -30,7 +30,7 @@
 #define GIT_REV "Unknown"
 #endif
 
-#define CONFIG_VERSION "v2.1"
+#define CONFIG_VERSION "v2.2"
 #define PRODUCT_NAME "anton"
 #define DEFAULT_PASSWORD "anton-system"
 
@@ -93,10 +93,9 @@ static const char particleSensorRXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "
 static const char particleSensorRXNames[][STRING_LEN] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
 static const char particleSensorTXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
 #elif defined(ESP32)
-static const char particleSensorRXValues[][4] = {"U0", "U1", "U2"};
+static const char particleSensorRXValues[][4] = {"U0", "U2"};
 static const char particleSensorRXNames[][STRING_LEN] = {
     "UART0(rx:GPIO3,tx:GPIO1)",
-    "UART1(rx:GPIO9,tx:GPIO10)",
     "UART2(rx:GPIO16,tx:GPIO17)"};
 static const char particleSensorTXValues[][4] = {"--"};
 #endif
@@ -164,33 +163,20 @@ iotwebconf::SelectTParameter<STRING_LEN> vocSensor =
         .defaultValue("zh03b")
         .build();
 
-Stream *airSensorSerial;
+iotwebconf::ParameterGroup co2SensorGroup = iotwebconf::ParameterGroup("co2SensorGroup", "CO2 Sensor");
+iotwebconf::CheckboxTParameter co2SensorEnable =
+    iotwebconf::Builder<iotwebconf::CheckboxTParameter>("co2SensorEnable")
+        .label("Enabled")
+        .defaultValue(false)
+        .build();
+
+Stream *airSensorSerial = nullptr;
 AirSensor *airSensor = nullptr;
 Reporter *reporter = nullptr;
-EnvironmentSensor *environmentSensor;
-Stream *co2SensorSerial;
-CO2Sensor *co2Sensor;
-Anton *anton;
-
-void _delay(unsigned long ms, const char *msg = nullptr)
-{
-  const int now = millis();
-
-  if (msg)
-  {
-    Serial.println(msg);
-  }
-
-  while (1)
-  {
-    iotWebConf.doLoop();
-    delay(100);
-    if (millis() - now > ms)
-    {
-      break;
-    }
-  }
-}
+EnvironmentSensor *environmentSensor = nullptr;
+Stream *co2SensorSerial = nullptr;
+CO2Sensor *co2Sensor = nullptr;
+Anton *anton = nullptr;
 
 void resetAll()
 {
@@ -200,6 +186,7 @@ void resetAll()
   influxdbGroup.applyDefaultValue();
   particleSensorGroup.applyDefaultValue();
   vocSensorGroup.applyDefaultValue();
+  co2SensorGroup.applyDefaultValue();
   iotWebConf.saveConfig();
   ESP.restart();
 }
@@ -326,6 +313,9 @@ void setup()
   vocSensorGroup.addItem(&vocSensor);
   iotWebConf.addParameterGroup(&vocSensorGroup);
 
+  co2SensorGroup.addItem(&co2SensorEnable);
+  iotWebConf.addParameterGroup(&co2SensorGroup);
+
   iotWebConf.setWifiConnectionCallback(&wifiConnected);
   iotWebConf.setWifiConnectionTimeoutMs(60000);
 
@@ -418,13 +408,17 @@ void setup()
     environmentSensor = BME;
   }
 
-  // TODO: handle on config
+  if (co2SensorEnable.value())
+  {
+    // TODO: make esp8266 correct
 #ifdef ESP8266
-  co2SensorSerial = util::getSerial(particleSensorRX.value(), particleSensorTX.value());
+    co2SensorSerial = util::getSerial(particleSensorRX.value(), particleSensorTX.value());
 #elif defined(ESP32)
-  co2SensorSerial = util::getSerial("U0");
+    co2SensorSerial = util::getSerial("U0");
 #endif
-  co2Sensor = new MHZ19B_CO2Sensor(co2SensorSerial);
+    co2Sensor = new MHZ19B_CO2Sensor(co2SensorSerial);
+  }
+
   anton = new Anton(reporter, airSensor, co2Sensor, environmentSensor);
 }
 

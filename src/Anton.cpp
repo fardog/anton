@@ -3,16 +3,19 @@
 
 Anton::Anton(Reporter *reporter,
              AirSensor *airSensor,
+             CO2Sensor *co2Sensor,
              EnvironmentSensor *environmentSensor,
              uint16_t timeBetweenMeasurements)
     : _reporter(reporter),
       _airSensor(airSensor),
+      _co2Sensor(co2Sensor),
       _environmentSensor(environmentSensor),
       _states{
           {StateId::STARTUP, 0, 0, StateId::WAKE_SENSORS},
           {StateId::WAKE_SENSORS, 0, 0, StateId::WARM_UP},
           {StateId::WARM_UP, 10000, 0, StateId::SAMPLE_PARTICULATE},
-          {StateId::SAMPLE_PARTICULATE, 0, 30000, StateId::SAMPLE_MISC},
+          {StateId::SAMPLE_PARTICULATE, 0, 30000, StateId::SAMPLE_CO2},
+          {StateId::SAMPLE_CO2, 0, 30000, StateId::SAMPLE_MISC},
           {StateId::SAMPLE_MISC, 0, 10000, StateId::SLEEP_SENSORS},
           {StateId::SLEEP_SENSORS, 0, 10000, StateId::REPORT},
           {StateId::REPORT, 0, 30000, StateId::SLEEP},
@@ -53,6 +56,9 @@ void Anton::loop()
     break;
   case SAMPLE_PARTICULATE:
     _sampleParticulate();
+    break;
+  case SAMPLE_CO2:
+    _sampleCO2();
     break;
   case SAMPLE_MISC:
     _sampleMisc();
@@ -123,6 +129,22 @@ void Anton::_sampleParticulate()
                     _airData.p2_5,
                     _airData.p10_0);
 
+      _nextState();
+    }
+  }
+  else
+  {
+    _nextState();
+  }
+}
+
+void Anton::_sampleCO2()
+{
+  if (_co2Sensor)
+  {
+    _co2Sensor->loop();
+    if (_co2Sensor->getCO2Data(&_co2Data))
+    {
       _nextState();
     }
   }

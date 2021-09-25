@@ -33,6 +33,9 @@ const char *serverIndex = R"(
       
       <dt>IAQ</dt>
       <dd>%d</dd>
+
+      <dt>CO2 (PPM)</dt>
+      <dd>%d</dd>
     </dl>
 
     <h1>Stats</h1>
@@ -47,6 +50,9 @@ const char *serverIndex = R"(
       <dd>%s</dd>
     </dl>
     Visit the <a href="/config">config page</a>.
+
+    <h1>Calibration</h1>
+    Visit the <a href="/calibrate">calibration page</a>.
 
     <h1>Reset</h1>
     Visit the <a href="/reset">reset page</a>.
@@ -64,6 +70,33 @@ const char *serverUnconfigured = R"(
   <body>
     <h1>Unconfigured</h1>
     Visit the <a href="/config">config page</a> to perform configuration.
+  </body>
+</html>
+)";
+
+const char *calibrationPage = R"(
+<!DOCTYPE html>
+<html>
+  <body>
+    <a href="/">&lt; Back</a>
+    <h1>Calibration</h1>
+    <form method="POST" action="/calibrate">
+      <input type="submit" value="Calibrate">
+    </form>
+  </body>
+</html>
+)";
+
+const char *calibrationResultPage = R"(
+<!DOCTYPE html>
+<html>
+  <body>
+    <a href="/">&lt; Back</a>
+    <h1>Calibration Result</h1>
+    <ul>
+      <li>CO2: %s</li>
+    </ul>
+    <p>Please leave the sensor in a neutral location for 20 minutes.</p>
   </body>
 </html>
 )";

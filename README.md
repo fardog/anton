@@ -28,10 +28,13 @@ Hardware:
     work.
 * (Optional) A multisensor:
   * [BME680][] sensor and breakout board; configured for i2c
+* (Optional) A CO² sensor:
+  * [MH-Z19B][]
 
 [ZH03B]: https://www.winsen-sensor.com/sensors/dust-sensor/zh3b.html
 [PMS7003]: http://www.plantower.com/en/content/?110.html
 [BME680]: https://www.bosch-sensortec.com/products/environmental-sensors/gas-sensors-bme680/
+[MH-Z19B]: https://www.winsen-sensor.com/sensors/co2-sensor/mh-z19b.html
 
 Software:
 
@@ -69,6 +72,14 @@ Or the PMS7003 as follows:
 * ESP32
   * SCL: `SCL` (`GPIO22`)
   * SDA: `SDA` (`GPIO21`)
+
+(Optional) Wire the MH-Z19B as follows, tested only on ESP32:
+
+* VCC: `VU`
+* GND: `Ground`
+* ESP32:
+  * TXD: `RX0
+  * RXD: `TX0`
 
 A 3D printable case for Anton is available at [PrusaPrinters][]. **Note:** the
 case fits the ZH03B and ESP8266; for PMS7003 or ESP32, you're on your own right

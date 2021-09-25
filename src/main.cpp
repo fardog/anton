@@ -22,6 +22,8 @@
 #include "sensors/PMS_AirSensor.h"
 #include "sensors/EnvironmentSensor.h"
 #include "sensors/BME680_EnvironmentSensor.h"
+#include "sensors/CO2Sensor.h"
+#include "sensors/MHZ19B_CO2Sensor.h"
 #include "util.h"
 
 #ifndef GIT_REV
@@ -166,6 +168,8 @@ Stream *airSensorSerial;
 AirSensor *airSensor = nullptr;
 Reporter *reporter = nullptr;
 EnvironmentSensor *environmentSensor;
+Stream *co2SensorSerial;
+CO2Sensor *co2Sensor;
 Anton *anton;
 
 void _delay(unsigned long ms, const char *msg = nullptr)
@@ -211,6 +215,7 @@ void renderIndexPage(char *buf, Anton *anton)
   AirData ad = anton->airData();
   EnvironmentData ed = anton->environmentData();
   CalculatedAQI aqi = anton->aqi();
+  CO2Data co2 = anton->co2Data();
 
   int lastMeasured = -1;
   if (ad.timestamp > 0)
@@ -244,6 +249,7 @@ void renderIndexPage(char *buf, Anton *anton)
       util::rnd(ed.tempC),
       util::rnd(ed.humPct),
       util::rnd(ed.iaq),
+      co2.ppm,
       millis() / 1000,
       sensorName.value(),
       influxdbURL,
@@ -269,6 +275,31 @@ void handleRoot()
   {
     server.send(200, "text/html", serverUnconfigured);
   }
+}
+
+void handleGetCalibrate()
+{
+  server.send(200, "text/html", calibrationPage);
+}
+
+void handlePostCalibrate()
+{
+  String co2Success = String("NOT PRESENT");
+  if (co2Sensor)
+  {
+    if (co2Sensor->calibrate())
+    {
+      co2Success = String("REQUESTED");
+    }
+    else
+    {
+      co2Success = String("FAILED");
+    }
+  }
+
+  char buf[2048];
+  sprintf(buf, calibrationResultPage, co2Success.c_str());
+  server.send(200, "text/html", buf);
 }
 
 void setup()
@@ -312,6 +343,8 @@ void setup()
   server.onNotFound([]()
                     { iotWebConf.handleNotFound(); });
 
+  server.on("/calibrate", handleGetCalibrate);
+  server.on("/calibrate", HTTP_POST, handlePostCalibrate);
   server.on("/reset", HTTP_GET, []()
             {
               Serial.println("http: serving reset");
@@ -385,7 +418,14 @@ void setup()
     environmentSensor = BME;
   }
 
-  anton = new Anton(reporter, airSensor, environmentSensor);
+  // TODO: handle on config
+#ifdef ESP8266
+  co2SensorSerial = util::getSerial(particleSensorRX.value(), particleSensorTX.value());
+#elif defined(ESP32)
+  co2SensorSerial = util::getSerial("U0");
+#endif
+  co2Sensor = new MHZ19B_CO2Sensor(co2SensorSerial);
+  anton = new Anton(reporter, airSensor, co2Sensor, environmentSensor);
 }
 
 void wifiConnected()

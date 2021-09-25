@@ -77,8 +77,11 @@ Or the PMS7003 as follows:
 
 * VCC: `VU`
 * GND: `Ground`
+* ESP8266
+  * TXD: `D5`
+  * RXD: `D6`
 * ESP32:
-  * TXD: `RX0
+  * TXD: `RX0`
   * RXD: `TX0`
 
 A 3D printable case for Anton is available at [PrusaPrinters][]. **Note:** the

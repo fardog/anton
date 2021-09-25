@@ -25,53 +25,7 @@ void util::clearEEPROM()
 }
 
 #ifdef ESP8266
-int8_t util::stringToPin(const char *s)
-{
-    if (strcmp(s, "D1") == 0)
-    {
-        return D1;
-    }
-    if (strcmp(s, "D2") == 0)
-    {
-        return D2;
-    }
-    if (strcmp(s, "D3") == 0)
-    {
-        return D3;
-    }
-    if (strcmp(s, "D4") == 0)
-    {
-        return D4;
-    }
-    if (strcmp(s, "D5") == 0)
-    {
-        return D5;
-    }
-    if (strcmp(s, "D6") == 0)
-    {
-        return D6;
-    }
-    if (strcmp(s, "D7") == 0)
-    {
-        return D7;
-    }
-    if (strcmp(s, "D8") == 0)
-    {
-        return D8;
-    }
-    if (strcmp(s, "D9") == 0)
-    {
-        return D9;
-    }
-    if (strcmp(s, "D10") == 0)
-    {
-        return D10;
-    }
-
-    return -1;
-}
-
-Stream *util::getSerial(const char *rx, const char *tx)
+Stream *util::getSerial(uint8_t rxPin, uint8_t txPin)
 {
     int8_t rxPin = stringToPin(rx);
     int8_t txPin = stringToPin(tx);
@@ -81,28 +35,8 @@ Stream *util::getSerial(const char *rx, const char *tx)
     return serial;
 }
 #elif defined(ESP32)
-int8_t util::stringToUart(const char *s)
+Stream *util::getSerial(uint8_t uartNo)
 {
-    if (strcmp(s, "U0") == 0)
-    {
-        return 0;
-    }
-    if (strcmp(s, "U1") == 0)
-    {
-        return 1;
-    }
-    if (strcmp(s, "U2") == 0)
-    {
-        return 2;
-    }
-
-    return -1;
-}
-
-Stream *util::getSerial(const char *uart)
-{
-    int8_t uartNo = stringToUart(uart);
-
     HardwareSerial *serial = new HardwareSerial(uartNo);
     serial->begin(9600);
 

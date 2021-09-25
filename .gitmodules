@@ -16,3 +16,6 @@
 [submodule "lib/PMS"]
 	path = lib/PMS
 	url = git@github.com:fu-hsi/PMS.git
+[submodule "lib/ErriezMHZ19B"]
+	path = lib/ErriezMHZ19B
+	url = git@github.com:Erriez/ErriezMHZ19B.git

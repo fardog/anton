@@ -92,7 +92,7 @@ const char *calibrationPage = R"(
   <body>
     <a href="/">&lt; Back</a>
     <h1>Calibration</h1>
-    <form method="POST" action="/calibrate">
+    <form method="POST" action="/calibrate-confirm">
       <input type="submit" value="Calibrate">
     </form>
   </body>

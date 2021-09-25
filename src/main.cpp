@@ -344,7 +344,7 @@ void setup()
                     { iotWebConf.handleNotFound(); });
 
   server.on("/calibrate", handleGetCalibrate);
-  server.on("/calibrate", HTTP_POST, handlePostCalibrate);
+  server.on("/calibrate-confirm", HTTP_POST, handlePostCalibrate);
   server.on("/reset", HTTP_GET, []()
             {
               Serial.println("http: serving reset");

@@ -2,7 +2,11 @@
 
 const char *serverIndex = R"(
 <!DOCTYPE html>
-<html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anton: Home</title>
+  </head>
   <body>
     <h1>Particulate Sensor</h1>
     Measured %d seconds ago, reported %d seconds ago; last result was %s.
@@ -66,7 +70,11 @@ const char *serverIndex = R"(
 
 const char *serverUnconfigured = R"(
 <!DOCTYPE html>
-<html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anton: Unconfigured</title>
+  </head>
   <body>
     <h1>Unconfigured</h1>
     Visit the <a href="/config">config page</a> to perform configuration.
@@ -76,7 +84,11 @@ const char *serverUnconfigured = R"(
 
 const char *calibrationPage = R"(
 <!DOCTYPE html>
-<html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anton: Calibration</title>
+  </head>
   <body>
     <a href="/">&lt; Back</a>
     <h1>Calibration</h1>
@@ -89,7 +101,11 @@ const char *calibrationPage = R"(
 
 const char *calibrationResultPage = R"(
 <!DOCTYPE html>
-<html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anton: Calibration</title>
+  </head>
   <body>
     <a href="/">&lt; Back</a>
     <h1>Calibration Result</h1>
@@ -103,7 +119,11 @@ const char *calibrationResultPage = R"(
 
 const char *resetPage = R"(
 <!DOCTYPE html>
-<html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anton: Reset</title>
+  </head>
   <body>
     <a href="/">&lt; Back</a>
     <h1>Reboot</h1>

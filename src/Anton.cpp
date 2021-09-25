@@ -196,6 +196,7 @@ void Anton::_report()
   AirData *ad = nullptr;
   EnvironmentData *ed = nullptr;
   CalculatedAQI *aqi = nullptr;
+  CO2Data *co2 = nullptr;
 
   if (_airSensor)
   {
@@ -211,7 +212,12 @@ void Anton::_report()
     ed = &_environmentData;
   }
 
-  if (_reporter->report(ad, aqi, ed))
+  if (_co2Sensor)
+  {
+    co2 = &_co2Data;
+  }
+
+  if (_reporter->report(ad, aqi, ed, co2))
   {
     _lastErrorMessage = "";
     _lastReported = millis();

@@ -34,6 +34,7 @@ void Anton::loop()
   if (_state.timeout > 0 && now > _lastTransition + _state.timeout)
   {
     Serial.printf("state %d timed out; moving to next state\n", _state.state);
+    _stateFailed[_state.state] = true;
     _nextState();
     return;
   }
@@ -80,6 +81,7 @@ void Anton::_nextState()
   _stateStart = millis() + _state.delay;
   _lastTransition = _stateStart;
   _state = _states[_state.next];
+  _stateFailed[_state.state] = false;
 }
 
 void Anton::_retry(uint16_t delay)
@@ -198,7 +200,7 @@ void Anton::_report()
   CalculatedAQI *aqi = nullptr;
   CO2Data *co2 = nullptr;
 
-  if (_airSensor)
+  if (_airSensor && !_stateFailed[SAMPLE_PARTICULATE])
   {
     ad = &_airData;
     if (calculateAQI(_airData, &_aqi))
@@ -207,12 +209,12 @@ void Anton::_report()
     }
   }
 
-  if (_environmentSensor)
+  if (_environmentSensor && !_stateFailed[SAMPLE_MISC])
   {
     ed = &_environmentData;
   }
 
-  if (_co2Sensor)
+  if (_co2Sensor && !_stateFailed[SAMPLE_CO2])
   {
     co2 = &_co2Data;
   }

@@ -81,8 +81,8 @@ Or the PMS7003 as follows:
   * TXD: `D5`
   * RXD: `D6`
 * ESP32:
-  * TXD: `RX0`
-  * RXD: `TX0`
+  * TXD: `GPIO18`
+  * RXD: `GPIO19`
 
 A 3D printable case for Anton is available at [PrusaPrinters][]. **Note:** the
 case fits the ZH03B and ESP8266; for PMS7003 or ESP32, you're on your own right

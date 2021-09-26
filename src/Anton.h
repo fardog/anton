@@ -79,6 +79,7 @@ private:
   EnvironmentData _environmentData{};
   CalculatedAQI _aqi{};
   String _lastErrorMessage{""};
+  bool _stateFailed[numStates]{};
 };
 
 #endif

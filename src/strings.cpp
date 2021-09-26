@@ -38,7 +38,7 @@ const char *serverIndex = R"(
       <dt>IAQ</dt>
       <dd>%d</dd>
 
-      <dt>CO2 (PPM)</dt>
+      <dt>CO<sub>2</sub> (PPM)</dt>
       <dd>%d</dd>
     </dl>
 
@@ -110,7 +110,7 @@ const char *calibrationResultPage = R"(
     <a href="/">&lt; Back</a>
     <h1>Calibration Result</h1>
     <ul>
-      <li>CO2: %s</li>
+      <li>CO<sub>2</sub>: %s</li>
     </ul>
     <p>Please leave the sensor in a neutral location for 20 minutes.</p>
   </body>

@@ -15,8 +15,8 @@ Anton::Anton(Reporter *reporter,
           {StateId::WAKE_SENSORS, 0, 0, StateId::WARM_UP},
           {StateId::WARM_UP, 10000, 0, StateId::SAMPLE_PARTICULATE},
           {StateId::SAMPLE_PARTICULATE, 0, 30000, StateId::SAMPLE_CO2},
-          {StateId::SAMPLE_CO2, 0, 30000, StateId::SAMPLE_MISC},
-          {StateId::SAMPLE_MISC, 0, 10000, StateId::SLEEP_SENSORS},
+          {StateId::SAMPLE_CO2, 0, 30000, StateId::SAMPLE_ENVIRONMENT},
+          {StateId::SAMPLE_ENVIRONMENT, 0, 10000, StateId::SLEEP_SENSORS},
           {StateId::SLEEP_SENSORS, 0, 10000, StateId::REPORT},
           {StateId::REPORT, 0, 30000, StateId::SLEEP},
           {StateId::SLEEP, timeBetweenMeasurements, 0, StateId::WAKE_SENSORS},
@@ -61,8 +61,8 @@ void Anton::loop()
   case SAMPLE_CO2:
     _sampleCO2();
     break;
-  case SAMPLE_MISC:
-    _sampleMisc();
+  case SAMPLE_ENVIRONMENT:
+    _sampleEnvironment();
   case SLEEP_SENSORS:
     _sleepSensors();
     break;
@@ -156,7 +156,7 @@ void Anton::_sampleCO2()
   }
 }
 
-void Anton::_sampleMisc()
+void Anton::_sampleEnvironment()
 {
   if (_environmentSensor)
   {
@@ -209,7 +209,7 @@ void Anton::_report()
     }
   }
 
-  if (_environmentSensor && !_stateFailed[SAMPLE_MISC])
+  if (_environmentSensor && !_stateFailed[SAMPLE_ENVIRONMENT])
   {
     ed = &_environmentData;
   }

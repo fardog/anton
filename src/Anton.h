@@ -15,7 +15,7 @@ enum StateId
   WARM_UP,
   SAMPLE_PARTICULATE,
   SAMPLE_CO2,
-  SAMPLE_MISC,
+  SAMPLE_ENVIRONMENT,
   SLEEP_SENSORS,
   REPORT,
   SLEEP
@@ -64,7 +64,7 @@ private:
   void _sampleParticulate();
   void _sampleCO2();
   void _sleepSensors();
-  void _sampleMisc();
+  void _sampleEnvironment();
   void _report();
   void _sleep();
 

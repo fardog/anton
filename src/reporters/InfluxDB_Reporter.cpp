@@ -13,7 +13,7 @@ InfluxDB_Reporter::InfluxDB_Reporter(const char *sensorName,
 {
 }
 
-bool InfluxDB_Reporter::report(AirData *air, CalculatedAQI *aqi, EnvironmentData *env)
+bool InfluxDB_Reporter::report(AirData *air, CalculatedAQI *aqi, EnvironmentData *env, CO2Data *co2)
 {
     Point measurement("particulate_matter");
     measurement.addTag("node", _sensorName);
@@ -42,6 +42,11 @@ bool InfluxDB_Reporter::report(AirData *air, CalculatedAQI *aqi, EnvironmentData
         measurement.addField("pressure", util::rnd(env->pressure));
         measurement.addField("gas_resistance", util::rnd(env->gasResistance));
         measurement.addField("iaq", util::rnd(env->iaq));
+    }
+
+    if (co2)
+    {
+        measurement.addField("co2", (int)co2->ppm);
     }
 
     Serial.print("post_measurement: ");

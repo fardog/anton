@@ -2,7 +2,11 @@
 
 const char *serverIndex = R"(
 <!DOCTYPE html>
-<html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anton: Home</title>
+  </head>
   <body>
     <h1>Particulate Sensor</h1>
     Measured %d seconds ago, reported %d seconds ago; last result was %s.
@@ -33,6 +37,9 @@ const char *serverIndex = R"(
       
       <dt>IAQ</dt>
       <dd>%d</dd>
+
+      <dt>CO<sub>2</sub> (PPM)</dt>
+      <dd>%d</dd>
     </dl>
 
     <h1>Stats</h1>
@@ -48,6 +55,9 @@ const char *serverIndex = R"(
     </dl>
     Visit the <a href="/config">config page</a>.
 
+    <h1>Calibration</h1>
+    Visit the <a href="/calibrate">calibration page</a>.
+
     <h1>Reset</h1>
     Visit the <a href="/reset">reset page</a>.
     <footer>
@@ -60,7 +70,11 @@ const char *serverIndex = R"(
 
 const char *serverUnconfigured = R"(
 <!DOCTYPE html>
-<html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anton: Unconfigured</title>
+  </head>
   <body>
     <h1>Unconfigured</h1>
     Visit the <a href="/config">config page</a> to perform configuration.
@@ -68,9 +82,48 @@ const char *serverUnconfigured = R"(
 </html>
 )";
 
+const char *calibrationPage = R"(
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anton: Calibration</title>
+  </head>
+  <body>
+    <a href="/">&lt; Back</a>
+    <h1>Calibration</h1>
+    <form method="POST" action="/calibrate-confirm">
+      <input type="submit" value="Calibrate">
+    </form>
+  </body>
+</html>
+)";
+
+const char *calibrationResultPage = R"(
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anton: Calibration</title>
+  </head>
+  <body>
+    <a href="/">&lt; Back</a>
+    <h1>Calibration Result</h1>
+    <ul>
+      <li>CO<sub>2</sub>: %s</li>
+    </ul>
+    <p>Please leave the sensor in a neutral location for 20 minutes.</p>
+  </body>
+</html>
+)";
+
 const char *resetPage = R"(
 <!DOCTYPE html>
-<html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anton: Reset</title>
+  </head>
   <body>
     <a href="/">&lt; Back</a>
     <h1>Reboot</h1>

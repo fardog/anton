@@ -22,17 +22,33 @@
 #include "sensors/PMS_AirSensor.h"
 #include "sensors/EnvironmentSensor.h"
 #include "sensors/BME680_EnvironmentSensor.h"
+#include "sensors/CO2Sensor.h"
+#include "sensors/MHZ19B_CO2Sensor.h"
 #include "util.h"
 
 #ifndef GIT_REV
 #define GIT_REV "Unknown"
 #endif
 
-#define CONFIG_VERSION "v2.1"
+#define STRING_LEN 128
+
+#define CONFIG_VERSION "v3.0"
 #define PRODUCT_NAME "anton"
 #define DEFAULT_PASSWORD "anton-system"
 
-#define STRING_LEN 128
+// pins
+#ifdef ESP8266
+#define PARTICULATE_RX D3
+#define PARTICULATE_TX D4
+// TODO: reevaluate these
+#define CO2_RX D5
+#define CO2_TX D6
+#elif defined(ESP32)
+#define PARTICULATE_UART 2
+#define CO2_UART 1
+#define UART_1_RX 18
+#define UART_1_TX 19
+#endif
 
 // constants initialized at setup
 char influxdbURL[200] = "";
@@ -86,18 +102,6 @@ iotwebconf::TextTParameter<STRING_LEN> influxdbDatabase =
 
 static const char particleSensorValues[][STRING_LEN] = {"zh03b", "pms7003"};
 static const char particleSensorNames[][STRING_LEN] = {"Winsen ZH03B", "Plantower PMS7003"};
-#ifdef ESP8266
-static const char particleSensorRXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
-static const char particleSensorRXNames[][STRING_LEN] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
-static const char particleSensorTXValues[][4] = {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"};
-#elif defined(ESP32)
-static const char particleSensorRXValues[][4] = {"U0", "U1", "U2"};
-static const char particleSensorRXNames[][STRING_LEN] = {
-    "UART0(rx:GPIO3,tx:GPIO1)",
-    "UART1(rx:GPIO9,tx:GPIO10)",
-    "UART2(rx:GPIO16,tx:GPIO17)"};
-static const char particleSensorTXValues[][4] = {"--"};
-#endif
 iotwebconf::ParameterGroup particleSensorGroup = iotwebconf::ParameterGroup("particleSensorGroup", "Particulate Sensor");
 iotwebconf::CheckboxTParameter particleSensorEnable =
     iotwebconf::Builder<iotwebconf::CheckboxTParameter>("particleSensorEnable")
@@ -112,36 +116,6 @@ iotwebconf::SelectTParameter<STRING_LEN> particleSensor =
         .optionCount(sizeof(particleSensorValues) / STRING_LEN)
         .nameLength(STRING_LEN)
         .defaultValue("zh03b")
-        .build();
-iotwebconf::SelectTParameter<4> particleSensorRX =
-    iotwebconf::Builder<iotwebconf::SelectTParameter<4>>("particleSensorRX")
-#ifdef ESP8266
-        .label("RX Pin")
-#elif defined(ESP32)
-        .label("UART")
-#endif
-        .optionValues((const char *)particleSensorRXValues)
-        .optionNames((const char *)particleSensorRXNames)
-        .optionCount(sizeof(particleSensorRXValues) / 4)
-        .nameLength(STRING_LEN)
-#ifdef ESP8266
-        .defaultValue("D3")
-#elif defined(ESP32)
-        .defaultValue("U2")
-#endif
-        .build();
-iotwebconf::SelectTParameter<4> particleSensorTX =
-    iotwebconf::Builder<iotwebconf::SelectTParameter<4>>("particleSensorTX")
-        .label("TX Pin")
-        .optionValues((const char *)particleSensorTXValues)
-        .optionNames((const char *)particleSensorTXValues)
-        .optionCount(sizeof(particleSensorTXValues) / 4)
-        .nameLength(4)
-#ifdef ESP8266
-        .defaultValue("D4")
-#elif defined(ESP32)
-        .defaultValue("--")
-#endif
         .build();
 
 static const char vocSensorValues[][STRING_LEN] = {"bme680"};
@@ -162,31 +136,31 @@ iotwebconf::SelectTParameter<STRING_LEN> vocSensor =
         .defaultValue("zh03b")
         .build();
 
-Stream *airSensorSerial;
+iotwebconf::ParameterGroup co2SensorGroup = iotwebconf::ParameterGroup("co2SensorGroup", "CO2 Sensor");
+iotwebconf::CheckboxTParameter co2SensorEnable =
+    iotwebconf::Builder<iotwebconf::CheckboxTParameter>("co2SensorEnable")
+        .label("Enabled")
+        .defaultValue(false)
+        .build();
+static const char co2SensorValues[][STRING_LEN] = {"mhz19b"};
+static const char co2SensorNames[][STRING_LEN] = {"Winsen MH-Z19B"};
+iotwebconf::SelectTParameter<STRING_LEN> co2SensorSelect =
+    iotwebconf::Builder<iotwebconf::SelectTParameter<STRING_LEN>>("co2SensorSelect")
+        .label("Sensor")
+        .optionValues((const char *)co2SensorValues)
+        .optionNames((const char *)co2SensorNames)
+        .optionCount(sizeof(co2SensorValues) / STRING_LEN)
+        .nameLength(STRING_LEN)
+        .defaultValue("mhz19b")
+        .build();
+
+Stream *airSensorSerial = nullptr;
 AirSensor *airSensor = nullptr;
 Reporter *reporter = nullptr;
-EnvironmentSensor *environmentSensor;
-Anton *anton;
-
-void _delay(unsigned long ms, const char *msg = nullptr)
-{
-  const int now = millis();
-
-  if (msg)
-  {
-    Serial.println(msg);
-  }
-
-  while (1)
-  {
-    iotWebConf.doLoop();
-    delay(100);
-    if (millis() - now > ms)
-    {
-      break;
-    }
-  }
-}
+EnvironmentSensor *environmentSensor = nullptr;
+Stream *co2SensorSerial = nullptr;
+CO2Sensor *co2Sensor = nullptr;
+Anton *anton = nullptr;
 
 void resetAll()
 {
@@ -196,6 +170,7 @@ void resetAll()
   influxdbGroup.applyDefaultValue();
   particleSensorGroup.applyDefaultValue();
   vocSensorGroup.applyDefaultValue();
+  co2SensorGroup.applyDefaultValue();
   iotWebConf.saveConfig();
   ESP.restart();
 }
@@ -211,6 +186,7 @@ void renderIndexPage(char *buf, Anton *anton)
   AirData ad = anton->airData();
   EnvironmentData ed = anton->environmentData();
   CalculatedAQI aqi = anton->aqi();
+  CO2Data co2 = anton->co2Data();
 
   int lastMeasured = -1;
   if (ad.timestamp > 0)
@@ -244,6 +220,7 @@ void renderIndexPage(char *buf, Anton *anton)
       util::rnd(ed.tempC),
       util::rnd(ed.humPct),
       util::rnd(ed.iaq),
+      co2.ppm,
       millis() / 1000,
       sensorName.value(),
       influxdbURL,
@@ -271,6 +248,31 @@ void handleRoot()
   }
 }
 
+void handleGetCalibrate()
+{
+  server.send(200, "text/html", calibrationPage);
+}
+
+void handlePostCalibrate()
+{
+  String co2Success = String("NOT PRESENT");
+  if (co2Sensor)
+  {
+    if (co2Sensor->calibrate())
+    {
+      co2Success = String("REQUESTED");
+    }
+    else
+    {
+      co2Success = String("FAILED");
+    }
+  }
+
+  char buf[2048];
+  sprintf(buf, calibrationResultPage, co2Success.c_str());
+  server.send(200, "text/html", buf);
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -287,13 +289,15 @@ void setup()
 
   particleSensorGroup.addItem(&particleSensorEnable);
   particleSensorGroup.addItem(&particleSensor);
-  particleSensorGroup.addItem(&particleSensorRX);
-  particleSensorGroup.addItem(&particleSensorTX);
   iotWebConf.addParameterGroup(&particleSensorGroup);
 
   vocSensorGroup.addItem(&vocSensorEnable);
   vocSensorGroup.addItem(&vocSensor);
   iotWebConf.addParameterGroup(&vocSensorGroup);
+
+  co2SensorGroup.addItem(&co2SensorEnable);
+  co2SensorGroup.addItem(&co2SensorSelect);
+  iotWebConf.addParameterGroup(&co2SensorGroup);
 
   iotWebConf.setWifiConnectionCallback(&wifiConnected);
   iotWebConf.setWifiConnectionTimeoutMs(60000);
@@ -312,6 +316,8 @@ void setup()
   server.onNotFound([]()
                     { iotWebConf.handleNotFound(); });
 
+  server.on("/calibrate", handleGetCalibrate);
+  server.on("/calibrate-confirm", HTTP_POST, handlePostCalibrate);
   server.on("/reset", HTTP_GET, []()
             {
               Serial.println("http: serving reset");
@@ -353,22 +359,20 @@ void setup()
   if (particleSensorEnable.value())
   {
 #ifdef ESP8266
-    airSensorSerial = util::getSerial(particleSensorRX.value(), particleSensorTX.value());
+    airSensorSerial = util::getSerial(PARTICULATE_RX, PARTICULATE_TX);
 #elif defined(ESP32)
-    airSensorSerial = util::getSerial(particleSensorRX.value());
+    airSensorSerial = util::getSerial(PARTICULATE_UART);
 #endif
 
     if (strcmp(particleSensor.value(), "zh03b") == 0)
     {
-      Serial.printf("setup: starting ZH03B particle sensor on serial: %s, %s\n",
-                    particleSensorRX.value(), particleSensorTX.value());
+      Serial.println("setup: starting ZH03B particle sensor on serial");
       ZH03B_AirSensor *ZH = new ZH03B_AirSensor(*airSensorSerial);
       airSensor = ZH;
     }
     else if (strcmp(particleSensor.value(), "pms7003") == 0)
     {
-      Serial.printf("setup: starting PMS7003 particle sensor on serial: %s, %s\n",
-                    particleSensorRX.value(), particleSensorTX.value());
+      Serial.println("setup: starting PMS7003 particle sensor on serial");
       PMS_AirSensor *PMS = new PMS_AirSensor(*airSensorSerial);
       airSensor = PMS;
     }
@@ -385,7 +389,17 @@ void setup()
     environmentSensor = BME;
   }
 
-  anton = new Anton(reporter, airSensor, environmentSensor);
+  if (co2SensorEnable.value())
+  {
+#ifdef ESP8266
+    co2SensorSerial = util::getSerial(CO2_RX, CO2_TX);
+#elif defined(ESP32)
+    co2SensorSerial = util::getSerial(CO2_UART, 9600, SERIAL_8N1, UART_1_RX, UART_1_TX);
+#endif
+    co2Sensor = new MHZ19B_CO2Sensor(co2SensorSerial);
+  }
+
+  anton = new Anton(reporter, airSensor, co2Sensor, environmentSensor);
 }
 
 void wifiConnected()

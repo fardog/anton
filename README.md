@@ -28,10 +28,13 @@ Hardware:
     work.
 * (Optional) A multisensor:
   * [BME680][] sensor and breakout board; configured for i2c
+* (Optional) A CO₂ sensor:
+  * [MH-Z19B][]
 
 [ZH03B]: https://www.winsen-sensor.com/sensors/dust-sensor/zh3b.html
 [PMS7003]: http://www.plantower.com/en/content/?110.html
 [BME680]: https://www.bosch-sensortec.com/products/environmental-sensors/gas-sensors-bme680/
+[MH-Z19B]: https://www.winsen-sensor.com/sensors/co2-sensor/mh-z19b.html
 
 Software:
 
@@ -69,6 +72,17 @@ Or the PMS7003 as follows:
 * ESP32
   * SCL: `SCL` (`GPIO22`)
   * SDA: `SDA` (`GPIO21`)
+
+(Optional) Wire the MH-Z19B as follows, tested only on ESP32:
+
+* VCC: `VU`
+* GND: `Ground`
+* ESP8266
+  * TXD: `D5`
+  * RXD: `D6`
+* ESP32:
+  * TXD: `GPIO18`
+  * RXD: `GPIO19`
 
 A 3D printable case for Anton is available at [PrusaPrinters][]. **Note:** the
 case fits the ZH03B and ESP8266; for PMS7003 or ESP32, you're on your own right
@@ -139,6 +153,11 @@ Changes which are not backwards compatible will be listed here. Anton is under
 active development and does not have a fixed feature set, nor does it have
 version numbers yet. For now, changes will be listed by date.
 
+* **2021-09-25** Does away with pin/UART configurations and makes them compile
+  time. Also added CO₂ sensor options. This caused a revision of the
+  configuration options, and you will need to reconfigure the sensor after
+  flashing.
+
 * **2021-07-04** Moves from [WifiManager][] to [IotWebConf][]. *This is a
   backwards incompatible change.* You will need to reconfigure the sensor after
   upgrading.
@@ -163,6 +182,7 @@ This was quick to implement due to the following excellent libraries:
 * [@prampec/IotWebConf](https://github.com/prampec/IotWebConf)
 * [@SV-Zanshin/BME680](https://github.com/SV-Zanshin/BME680)
 * [@fu-hsi/PMS](https://github.com/fu-hsi/PMS)
+* [@Erriez/ErriezMHZ19B](https://github.com/Erriez/ErriezMHZ19B)
 
 ## License
 

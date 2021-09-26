@@ -3,17 +3,20 @@
 
 Anton::Anton(Reporter *reporter,
              AirSensor *airSensor,
+             CO2Sensor *co2Sensor,
              EnvironmentSensor *environmentSensor,
              uint16_t timeBetweenMeasurements)
     : _reporter(reporter),
       _airSensor(airSensor),
+      _co2Sensor(co2Sensor),
       _environmentSensor(environmentSensor),
       _states{
           {StateId::STARTUP, 0, 0, StateId::WAKE_SENSORS},
           {StateId::WAKE_SENSORS, 0, 0, StateId::WARM_UP},
           {StateId::WARM_UP, 10000, 0, StateId::SAMPLE_PARTICULATE},
-          {StateId::SAMPLE_PARTICULATE, 0, 30000, StateId::SAMPLE_MISC},
-          {StateId::SAMPLE_MISC, 0, 10000, StateId::SLEEP_SENSORS},
+          {StateId::SAMPLE_PARTICULATE, 0, 30000, StateId::SAMPLE_CO2},
+          {StateId::SAMPLE_CO2, 0, 30000, StateId::SAMPLE_ENVIRONMENT},
+          {StateId::SAMPLE_ENVIRONMENT, 0, 10000, StateId::SLEEP_SENSORS},
           {StateId::SLEEP_SENSORS, 0, 10000, StateId::REPORT},
           {StateId::REPORT, 0, 30000, StateId::SLEEP},
           {StateId::SLEEP, timeBetweenMeasurements, 0, StateId::WAKE_SENSORS},
@@ -31,6 +34,7 @@ void Anton::loop()
   if (_state.timeout > 0 && now > _lastTransition + _state.timeout)
   {
     Serial.printf("state %d timed out; moving to next state\n", _state.state);
+    _stateFailed[_state.state] = true;
     _nextState();
     return;
   }
@@ -54,8 +58,11 @@ void Anton::loop()
   case SAMPLE_PARTICULATE:
     _sampleParticulate();
     break;
-  case SAMPLE_MISC:
-    _sampleMisc();
+  case SAMPLE_CO2:
+    _sampleCO2();
+    break;
+  case SAMPLE_ENVIRONMENT:
+    _sampleEnvironment();
   case SLEEP_SENSORS:
     _sleepSensors();
     break;
@@ -74,6 +81,7 @@ void Anton::_nextState()
   _stateStart = millis() + _state.delay;
   _lastTransition = _stateStart;
   _state = _states[_state.next];
+  _stateFailed[_state.state] = false;
 }
 
 void Anton::_retry(uint16_t delay)
@@ -132,7 +140,23 @@ void Anton::_sampleParticulate()
   }
 }
 
-void Anton::_sampleMisc()
+void Anton::_sampleCO2()
+{
+  if (_co2Sensor)
+  {
+    _co2Sensor->loop();
+    if (_co2Sensor->getCO2Data(&_co2Data))
+    {
+      _nextState();
+    }
+  }
+  else
+  {
+    _nextState();
+  }
+}
+
+void Anton::_sampleEnvironment()
 {
   if (_environmentSensor)
   {
@@ -174,8 +198,9 @@ void Anton::_report()
   AirData *ad = nullptr;
   EnvironmentData *ed = nullptr;
   CalculatedAQI *aqi = nullptr;
+  CO2Data *co2 = nullptr;
 
-  if (_airSensor)
+  if (_airSensor && !_stateFailed[SAMPLE_PARTICULATE])
   {
     ad = &_airData;
     if (calculateAQI(_airData, &_aqi))
@@ -184,12 +209,17 @@ void Anton::_report()
     }
   }
 
-  if (_environmentSensor)
+  if (_environmentSensor && !_stateFailed[SAMPLE_ENVIRONMENT])
   {
     ed = &_environmentData;
   }
 
-  if (_reporter->report(ad, aqi, ed))
+  if (_co2Sensor && !_stateFailed[SAMPLE_CO2])
+  {
+    co2 = &_co2Data;
+  }
+
+  if (_reporter->report(ad, aqi, ed, co2))
   {
     _lastErrorMessage = "";
     _lastReported = millis();

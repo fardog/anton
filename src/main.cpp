@@ -45,7 +45,9 @@
 #define CO2_TX D6
 #elif defined(ESP32)
 #define PARTICULATE_UART 2
-#define CO2_UART 0
+#define CO2_UART 1
+#define UART_1_RX 18
+#define UART_1_TX 19
 #endif
 
 // constants initialized at setup
@@ -392,7 +394,7 @@ void setup()
 #ifdef ESP8266
     co2SensorSerial = util::getSerial(CO2_RX, CO2_TX);
 #elif defined(ESP32)
-    co2SensorSerial = util::getSerial(CO2_UART);
+    co2SensorSerial = util::getSerial(CO2_UART, 9600, SERIAL_8N1, UART_1_RX, UART_1_TX);
 #endif
     co2Sensor = new MHZ19B_CO2Sensor(co2SensorSerial);
   }

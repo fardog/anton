@@ -13,7 +13,11 @@ namespace util
 #ifdef ESP8266
     Stream *getSerial(uint8_t txPin, uint8_t rxPin);
 #elif defined(ESP32)
-    Stream *getSerial(uint8_t uartNo);
+    Stream *getSerial(uint8_t uartNo,
+                      unsigned long baud = 9600,
+                      uint32_t config = SERIAL_8N1,
+                      int8_t rxPin = -1,
+                      int8_t txPin = -1);
 #endif
 } // namespace util
 

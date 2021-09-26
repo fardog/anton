@@ -27,18 +27,19 @@ void util::clearEEPROM()
 #ifdef ESP8266
 Stream *util::getSerial(uint8_t rxPin, uint8_t txPin)
 {
-    int8_t rxPin = stringToPin(rx);
-    int8_t txPin = stringToPin(tx);
-
     SoftwareSerial *serial = new SoftwareSerial(rxPin, txPin);
     serial->begin(9600);
     return serial;
 }
 #elif defined(ESP32)
-Stream *util::getSerial(uint8_t uartNo)
+Stream *util::getSerial(uint8_t uartNo,
+                        unsigned long baud,
+                        uint32_t config,
+                        int8_t rxPin,
+                        int8_t txPin)
 {
     HardwareSerial *serial = new HardwareSerial(uartNo);
-    serial->begin(9600);
+    serial->begin(baud, config, rxPin, txPin);
 
     return serial;
 }

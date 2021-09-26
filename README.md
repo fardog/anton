@@ -28,7 +28,7 @@ Hardware:
     work.
 * (Optional) A multisensor:
   * [BME680][] sensor and breakout board; configured for i2c
-* (Optional) A CO² sensor:
+* (Optional) A CO₂ sensor:
   * [MH-Z19B][]
 
 [ZH03B]: https://www.winsen-sensor.com/sensors/dust-sensor/zh3b.html

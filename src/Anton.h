@@ -37,7 +37,7 @@ public:
         AirSensor *airSensor,
         CO2Sensor *co2Sensor,
         EnvironmentSensor *environmenSensor,
-        uint16_t timeBetweenMeasurements = 30000);
+        uint16_t timeBetweenMeasurements = 60000);
   ~Anton();
 
   void loop();

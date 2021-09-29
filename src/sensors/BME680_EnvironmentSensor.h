@@ -1,6 +1,8 @@
 #ifndef BME680_EnvironmentSensor_h
 #define BME680_EnvironmentSensor_h
 
+#define BME680_TEMPERATURE_OFFSET -3.0
+
 #include <Zanshin_BME680.h>
 
 #include "EnvironmentSensor.h"

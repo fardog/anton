@@ -22,7 +22,7 @@ bool BME680_EnvironmentSensor::getEnvironmentData(EnvironmentData *data)
         return false;
     }
 
-    data->tempC = (float)temp / 100;
+    data->tempC = (float)temp / 100 + BME680_TEMPERATURE_OFFSET;
     data->humPct = (float)hum / 1000;
     data->pressure = (float)pressure / 100;
     data->gasResistance = (float)gas / 100;
@@ -33,5 +33,4 @@ bool BME680_EnvironmentSensor::getEnvironmentData(EnvironmentData *data)
 
 void BME680_EnvironmentSensor::loop()
 {
-
 }

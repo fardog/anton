@@ -8,6 +8,9 @@ MHZ19B_CO2Sensor::~MHZ19B_CO2Sensor() {}
 
 void MHZ19B_CO2Sensor::loop()
 {
+  if (_ready)
+    return;
+
   if (_sensor.isReady())
   {
     int16_t ppm = _sensor.readCO2();
@@ -46,8 +49,7 @@ bool MHZ19B_CO2Sensor::getCO2Data(CO2Data *data)
     return false;
   }
 
-  data->ppm = _data.ppm;
-  data->timestamp = _data.timestamp;
+  memcpy(data, &_data, sizeof(CO2Data));
   _ready = false;
 
   return true;

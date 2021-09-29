@@ -29,6 +29,7 @@ private:
   PMS::DATA _buf;
   int _cur = 0;
   bool _ready = false;
+  bool _awake = true;
 };
 
 #endif

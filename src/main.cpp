@@ -385,7 +385,8 @@ void setup()
   if (vocSensorEnable.value())
   {
     Serial.println("setup: starting BME680 VOC sensor on I2C (default pins)");
-    BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(320, 150);
+    Wire.begin();
+    BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(Wire);
     environmentSensor = BME;
   }
 

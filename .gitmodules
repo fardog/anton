@@ -19,3 +19,6 @@
 [submodule "lib/ErriezMHZ19B"]
 	path = lib/ErriezMHZ19B
 	url = git@github.com:Erriez/ErriezMHZ19B.git
+[submodule "lib/BSEC-Arduino-library"]
+	path = lib/BSEC-Arduino-library
+	url = git@github.com:BoschSensortec/BSEC-Arduino-library.git

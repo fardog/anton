@@ -63,6 +63,7 @@ void Anton::loop()
     break;
   case SAMPLE_ENVIRONMENT:
     _sampleEnvironment();
+    break;
   case SLEEP_SENSORS:
     _sleepSensors();
     break;

@@ -180,7 +180,7 @@ This was quick to implement due to the following excellent libraries:
 * [@ShaggyDog18/SD_ZH03B](https://github.com/ShaggyDog18/SD_ZH03B)
 * [@tobiasschuerg/InfluxDB-Client-for-Arduino](https://github.com/tobiasschuerg/InfluxDB-Client-for-Arduino)
 * [@prampec/IotWebConf](https://github.com/prampec/IotWebConf)
-* [@SV-Zanshin/BME680](https://github.com/SV-Zanshin/BME680)
+* [@BoschSensortec/BSEC-Arduino-library](https://github.com/BoschSensortec/BSEC-Arduino-library)
 * [@fu-hsi/PMS](https://github.com/fu-hsi/PMS)
 * [@Erriez/ErriezMHZ19B](https://github.com/Erriez/ErriezMHZ19B)
 

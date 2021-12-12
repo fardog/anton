@@ -11,19 +11,19 @@
 class InfluxDB_Reporter : public Reporter
 {
 public:
-    InfluxDB_Reporter(const char *sensorName,
-                      const char *sensorLocation,
-                      const char *serverUrl,
-                      const char *db,
-                      bool debug = false);
-    bool report(AirData *air, CalculatedAQI *aqi, EnvironmentData *env, CO2Data *co2);
-    String getLastErrorMessage();
+  InfluxDB_Reporter(const char *sensorName,
+                    const char *sensorLocation,
+                    const char *serverUrl,
+                    const char *db,
+                    bool debug = false);
+  bool report(AirData *air, CalculatedAQI *aqi, EnvironmentData *env, CO2Data *co2);
+  String getLastErrorMessage();
 
 private:
-    InfluxDBClient _client;
-    const char *_sensorName;
-    const char *_sensorLocation;
-    bool _debug;
+  InfluxDBClient _client;
+  const char *_sensorName;
+  const char *_sensorLocation;
+  bool _debug;
 };
 
 #endif

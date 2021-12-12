@@ -3,11 +3,11 @@
 
 struct EnvironmentData
 {
-    float tempC;
-    float humPct;
-    float pressure;
-    float gasResistance;
-    float iaq;
+  float tempC;
+  float humPct;
+  float pressure;
+  float gasResistance;
+  float iaq;
 };
 
 float calculateIAQ(float gasResistance, float humPct);
@@ -15,8 +15,8 @@ float calculateIAQ(float gasResistance, float humPct);
 class EnvironmentSensor
 {
 public:
-    virtual bool getEnvironmentData(EnvironmentData *data) = 0;
-    virtual void loop() = 0;
+  virtual bool getEnvironmentData(EnvironmentData *data) = 0;
+  virtual void loop() = 0;
 };
 
 #endif

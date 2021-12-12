@@ -10,25 +10,25 @@
 class PMS_AirSensor : public AirSensor
 {
 public:
-	PMS_AirSensor(Stream &serial, bool debug = false);
-	~PMS_AirSensor();
+  PMS_AirSensor(Stream &serial, bool debug = false);
+  ~PMS_AirSensor();
 
-	bool getAirData(AirData *data);
-	void loop();
-	bool sleep();
-	bool wake();
+  bool getAirData(AirData *data);
+  void loop();
+  bool sleep();
+  bool wake();
 
 private:
-	PMS _sensor;
-	bool _debug;
+  PMS _sensor;
+  bool _debug;
 
-	uint16_t p1_0[PMS_NUM_SAMPLES];
-	uint16_t p2_5[PMS_NUM_SAMPLES];
-	uint16_t p10_0[PMS_NUM_SAMPLES];
+  uint16_t p1_0[PMS_NUM_SAMPLES];
+  uint16_t p2_5[PMS_NUM_SAMPLES];
+  uint16_t p10_0[PMS_NUM_SAMPLES];
 
-	PMS::DATA _buf;
-	int _cur = 0;
-	bool _ready = false;
+  PMS::DATA _buf;
+  int _cur = 0;
+  bool _ready = false;
 };
 
 #endif

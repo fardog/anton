@@ -4,5 +4,5 @@
 
 float calculateIAQ(float gasResistance, float humPct)
 {
-    return log(gasResistance) + 0.04 * humPct;
+  return log(gasResistance) + 0.04 * humPct;
 }

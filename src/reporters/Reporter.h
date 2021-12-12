@@ -8,8 +8,8 @@
 class Reporter
 {
 public:
-    virtual bool report(AirData *air, CalculatedAQI *aqi, EnvironmentData *env, CO2Data *co2) = 0;
-    virtual String getLastErrorMessage() = 0;
+  virtual bool report(AirData *air, CalculatedAQI *aqi, EnvironmentData *env, CO2Data *co2) = 0;
+  virtual String getLastErrorMessage() = 0;
 };
 
 #endif

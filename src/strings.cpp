@@ -34,7 +34,7 @@ const char *serverIndex = R"(
 
       <dt>Humidity (&#37;RH)</dt>
       <dd>%d</dd>
-      
+
       <dt>IAQ</dt>
       <dd>%d</dd>
 

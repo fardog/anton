@@ -6,6 +6,7 @@
 namespace util
 {
   int rnd(float val);
+  float rnd(float val, uint places);
   void clearEEPROM();
   int sortUint16Desc(const void *cmp1, const void *cmp2);
   uint16_t medianValue(uint16_t *values, int count);

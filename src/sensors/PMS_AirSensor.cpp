@@ -25,9 +25,10 @@ void PMS_AirSensor::loop()
 {
   // we have enough data and are ready to be read
   if (_ready)
-  {
     return;
-  }
+
+  if (!_awake)
+    return;
 
   bool success = _sensor.read(_buf);
   if (success)
@@ -48,6 +49,7 @@ void PMS_AirSensor::loop()
 bool PMS_AirSensor::sleep()
 {
   _sensor.sleep();
+  _awake = false;
   // no feedback, so just assume it worked
   return true;
 }
@@ -55,6 +57,7 @@ bool PMS_AirSensor::sleep()
 bool PMS_AirSensor::wake()
 {
   _sensor.wakeUp();
+  _awake = true;
   // no feedback, so just assume it worked
   return true;
 }

@@ -124,22 +124,52 @@ Measurements are submitted to the configured database as a measurement named
 * `aqi_contributor` the primary AQI contributor (highest value); the string will
   match the measurement name, e.g. `p2_5`
 
-If you have the optional multisensor connected, the following additional integer
-fields will be sent:
+**Note:** currently only PM10 and PM2.5 are accounted for in AQI measurements,
+following the EPA standard.
+
+**Note:** if the AQI cannot be determined, either due to overflow or other
+error, it will be omitted from the InfluxDB submission.
+
+### Multisensor
+
+If you have the optional multisensor connected, the following additional fields
+fields will be sent; all are integers unless noted:
 
 * `temperature` °C
 * `humidity` %rh
 * `pressure` hPa
 * `gas_resistance` Ohm
 * `iaq` EPA [IAQ][].
+* `iaq_accuracy` IAQ accuracy; see notes
+* `co2_equiv` Equivalent CO₂ PPM
+* `co2_equiv_accuracy` Equivalent CO₂ accuracy; see notes
+* `breath_voc` (float) Breath VOC
+* `breath_voc_accuracy` Breath VOC Accuracy; see notes
 
 [IAQ]: https://www.epa.gov/indoor-air-quality-iaq/introduction-indoor-air-quality
 
-**Note:** currently only PM10 and PM2.5 are accounted for in AQI measurements,
-following the EPA standard.
+**Note:** Various `accuracy` values are provided by the Bosch Sensortec
+[BSEC][bsec] library, which have the following meaning ([source][bsec-src]):
 
-**Note:** if the AQI cannot be determined, either due to overflow or other
-error, it will be omitted from the InfluxDB submission.
+* `0` sensor is stabilizing
+* `1` readings were too stable to define references
+* `2` currently calibrating
+* `3` calibrated
+
+[bsec-src]: https://community.bosch-sensortec.com/t5/Question-and-answers/What-does-the-IAQ-accuracy-mean-in-BSEC/qaq-p/5935
+
+### Dedicated CO₂ Sensor
+
+If you have the optional dedicated CO₂ sensor connected, the following
+additional integer fields will be sent:
+
+* `co2` PPM
+
+**Note:** when using the optional dedicated CO₂ sensor, you must provide a base
+calibration every few weeks. This can be done from the dashboard's calibration
+page, and should be initiated when background levels are low. If indoors it's
+recommended to open a window and allow good air circulation for several minute
+before performing the calibration. This calibration takes 20 minutes.
 
 ## Administration
 
@@ -152,6 +182,12 @@ sensor.
 Changes which are not backwards compatible will be listed here. Anton is under
 active development and does not have a fixed feature set, nor does it have
 version numbers yet. For now, changes will be listed by date.
+
+* **2021-12-12** Move to Bosch Sensortec's [BSEC][bsec] library for the BME680,
+  which improves accuracy of the temperature/humidity readings as well as
+  provides equivalent CO₂ values without the dedicated sensor. However this
+  brings additional license restrictions which you should [view and
+  accept][bosch] before using.
 
 * **2021-09-25** Does away with pin/UART configurations and makes them compile
   time. Also added CO₂ sensor options. This caused a revision of the
@@ -180,10 +216,18 @@ This was quick to implement due to the following excellent libraries:
 * [@ShaggyDog18/SD_ZH03B](https://github.com/ShaggyDog18/SD_ZH03B)
 * [@tobiasschuerg/InfluxDB-Client-for-Arduino](https://github.com/tobiasschuerg/InfluxDB-Client-for-Arduino)
 * [@prampec/IotWebConf](https://github.com/prampec/IotWebConf)
-* [@SV-Zanshin/BME680](https://github.com/SV-Zanshin/BME680)
+* [@BoschSensortec/BSEC-Arduino-library][bsec]
 * [@fu-hsi/PMS](https://github.com/fu-hsi/PMS)
 * [@Erriez/ErriezMHZ19B](https://github.com/Erriez/ErriezMHZ19B)
 
 ## License
 
-[GPL-3.0](./LICENSE)
+The code contained in this repo is released under the GNU [GPL-3.0](./LICENSE).
+
+Building this project requires pulling in the various submodules under the `lib`
+directory, each of which has their own license; of note the [BSEC][bsec] library
+provided by [Bosch Sensortec][bosch] has a closed source binary blob provided
+under a unique license which you must abide to use this software.
+
+[bsec]: https://github.com/BoschSensortec/BSEC-Arduino-library
+[bosch]: https://www.bosch-sensortec.com/software-tools/software/bsec/

@@ -42,6 +42,11 @@ bool InfluxDB_Reporter::report(AirData *air, CalculatedAQI *aqi, EnvironmentData
     measurement.addField("pressure", util::rnd(env->pressure));
     measurement.addField("gas_resistance", util::rnd(env->gasResistance));
     measurement.addField("iaq", util::rnd(env->iaq));
+    measurement.addField("iaq_accuracy", env->iaqAccuracy);
+    measurement.addField("co2_equiv", util::rnd(env->co2Ppm));
+    measurement.addField("co2_equiv_accuracy", env->co2Accuracy);
+    measurement.addField("breath_voc", util::rnd(env->breathVoc, 2));
+    measurement.addField("breath_voc_accuracy", env->breathVocAccuracy);
   }
 
   if (co2)

@@ -39,10 +39,15 @@ void Anton::loop()
     return;
   }
 
+  if (_airSensor)
+    _airSensor->loop();
+  if (_co2Sensor)
+    _co2Sensor->loop();
+  if (_environmentSensor)
+    _environmentSensor->loop();
+
   if (now < _stateStart)
-  {
     return;
-  }
 
   switch (_state.state)
   {
@@ -124,7 +129,6 @@ void Anton::_sampleParticulate()
 {
   if (_airSensor)
   {
-    _airSensor->loop();
     if (_airSensor->getAirData(&_airData))
     {
       Serial.printf("Particulate: PM1.0, PM2.5, PM10=[%d %d %d]\n",
@@ -145,7 +149,6 @@ void Anton::_sampleCO2()
 {
   if (_co2Sensor)
   {
-    _co2Sensor->loop();
     if (_co2Sensor->getCO2Data(&_co2Data))
     {
       _nextState();
@@ -161,21 +164,26 @@ void Anton::_sampleEnvironment()
 {
   if (_environmentSensor)
   {
-    _environmentSensor->loop();
     if (_environmentSensor->getEnvironmentData(&_environmentData))
     {
-      Serial.printf("Environment: %.2f°C, %.2f%%rh, IAQ %.2f, %.2fhPa, %.2fOhm\n",
+      Serial.printf("Environment: %.2f°C, %.2f%%rh, IAQ %.2f(%d), %.2fhPa, %.2fOhm, %.2fCO₂, %.2fVOC\n",
                     _environmentData.tempC,
                     _environmentData.humPct,
                     _environmentData.iaq,
+                    _environmentData.iaqAccuracy,
                     _environmentData.pressure,
-                    _environmentData.gasResistance);
+                    _environmentData.gasResistance,
+                    _environmentData.co2Ppm,
+                    _environmentData.breathVoc);
       _nextState();
+    }
+    else
+    {
+      Serial.printf("environment failed: %s\n", _environmentSensor->getLastError().c_str());
     }
   }
   else
   {
-
     _nextState();
   }
 }

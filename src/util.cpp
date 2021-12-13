@@ -13,6 +13,12 @@ int util::rnd(float val)
   return (int)round(val);
 }
 
+float util::rnd(float val, uint places)
+{
+  double e = exp10(places);
+  return rnd(val * e) / e;
+}
+
 void util::clearEEPROM()
 {
   int len = EEPROM.length();

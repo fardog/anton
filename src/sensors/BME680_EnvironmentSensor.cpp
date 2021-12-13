@@ -1,36 +1,66 @@
 #include "BME680_EnvironmentSensor.h"
 
-BME680_EnvironmentSensor::BME680_EnvironmentSensor(uint16_t gasTemp, uint16_t gasMillis)
-    : _sensor(BME680_Class()),
-      _gasTemp(gasTemp),
-      _gasMillis(gasMillis)
+BME680_EnvironmentSensor::BME680_EnvironmentSensor(TwoWire &i2c)
+    : _sensor(Bsec())
 {
-  _sensor.begin(I2C_STANDARD_MODE);
-  _sensor.setOversampling(TemperatureSensor, Oversample16); // Use enumerated type values
-  _sensor.setOversampling(HumiditySensor, Oversample16);    // Use enumerated type values
-  _sensor.setOversampling(PressureSensor, Oversample16);    // Use enumerated type values
-  _sensor.setIIRFilter(IIR4);                               // Use enumerated type values
-  _sensor.setGas(_gasTemp, _gasMillis);                     // 320°c for 150 milliseconds
+  _sensor.begin(BME680_I2C_ADDR_SECONDARY, i2c);
+  _sensor.updateSubscription(_sensorList, 11, BSEC_SAMPLE_RATE_LP);
 }
 
 bool BME680_EnvironmentSensor::getEnvironmentData(EnvironmentData *data)
 {
-  static int32_t temp, hum, pressure, gas;
-  bool success = _sensor.getSensorData(temp, hum, pressure, gas);
-  if (!success)
+  if (!_ready)
   {
     return false;
   }
 
-  data->tempC = (float)temp / 100 + BME680_TEMPERATURE_OFFSET;
-  data->humPct = (float)hum / 1000;
-  data->pressure = (float)pressure / 100;
-  data->gasResistance = (float)gas / 100;
-  data->iaq = calculateIAQ(data->gasResistance, data->humPct);
+  _ready = false;
+
+  memcpy(data, &_data, sizeof(EnvironmentData));
 
   return true;
 }
 
 void BME680_EnvironmentSensor::loop()
 {
+  if (_sensor.run())
+  {
+    _ready = true;
+    _data.tempC = _sensor.temperature;
+    _data.humPct = _sensor.humidity;
+    _data.pressure = _sensor.pressure;
+    _data.gasResistance = _sensor.gasResistance;
+    _data.iaq = _sensor.staticIaq;
+    _data.iaqAccuracy = _sensor.iaqAccuracy;
+    _data.co2Ppm = _sensor.co2Equivalent;
+    _data.co2Accuracy = _sensor.co2Accuracy;
+    _data.breathVoc = _sensor.breathVocEquivalent;
+    _data.breathVocAccuracy = _sensor.breathVocAccuracy;
+  }
+  else
+  {
+    if (_sensor.status != BSEC_OK)
+    {
+      if (_sensor.status < BSEC_OK)
+      {
+        _lastError = "BSEC error code : " + String(_sensor.status);
+      }
+      else
+      {
+        _lastError = "BSEC warning code : " + String(_sensor.status);
+      }
+    }
+
+    if (_sensor.bme680Status != BME680_OK)
+    {
+      if (_sensor.bme680Status < BME680_OK)
+      {
+        _lastError = "BME680 error code : " + String(_sensor.bme680Status);
+      }
+      else
+      {
+        _lastError = "BME680 warning code : " + String(_sensor.bme680Status);
+      }
+    }
+  }
 }

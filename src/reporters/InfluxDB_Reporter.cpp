@@ -39,8 +39,8 @@ bool InfluxDB_Reporter::report(AirData *air, CalculatedAQI *aqi, EnvironmentData
   {
     measurement.addField("temperature", util::rnd(env->tempC));
     measurement.addField("humidity", util::rnd(env->humPct));
-    measurement.addField("pressure", util::rnd(env->pressure));
-    measurement.addField("gas_resistance", util::rnd(env->gasResistance));
+    measurement.addField("pressure", util::rnd(env->pressure / 100.0));
+    measurement.addField("gas_resistance", util::rnd(env->gasResistance / 100.0));
     measurement.addField("iaq", util::rnd(env->iaq));
     measurement.addField("iaq_accuracy", env->iaqAccuracy);
     measurement.addField("co2_equiv", util::rnd(env->co2Ppm));

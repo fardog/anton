@@ -180,10 +180,18 @@ This was quick to implement due to the following excellent libraries:
 * [@ShaggyDog18/SD_ZH03B](https://github.com/ShaggyDog18/SD_ZH03B)
 * [@tobiasschuerg/InfluxDB-Client-for-Arduino](https://github.com/tobiasschuerg/InfluxDB-Client-for-Arduino)
 * [@prampec/IotWebConf](https://github.com/prampec/IotWebConf)
-* [@BoschSensortec/BSEC-Arduino-library](https://github.com/BoschSensortec/BSEC-Arduino-library)
+* [@BoschSensortec/BSEC-Arduino-library][bsec]
 * [@fu-hsi/PMS](https://github.com/fu-hsi/PMS)
 * [@Erriez/ErriezMHZ19B](https://github.com/Erriez/ErriezMHZ19B)
 
 ## License
 
-[GPL-3.0](./LICENSE)
+The code contained in this repo is released under the GNU [GPL-3.0](./LICENSE).
+
+Building this project requires pulling in the various submodules under the `lib`
+directory, each of which has their own license; of note the [BSEC][bsec] library
+provided by [Bosch Sensortec][bosch] has a closed source binary blob provided
+under a unique license which you must abide to use this software.
+
+[bsec]: https://github.com/BoschSensortec/BSEC-Arduino-library
+[bosch]: https://www.bosch-sensortec.com/software-tools/software/bsec/

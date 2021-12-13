@@ -183,6 +183,12 @@ Changes which are not backwards compatible will be listed here. Anton is under
 active development and does not have a fixed feature set, nor does it have
 version numbers yet. For now, changes will be listed by date.
 
+* **2021-12-12** Move to Bosch Sensortec's [BSEC][bsec] library for the BME680,
+  which improves accuracy of the temperature/humidity readings as well as
+  provides equivalent CO₂ values without the dedicated sensor. However this
+  brings additional license restrictions which you should [view and
+  accept][bosch] before using.
+
 * **2021-09-25** Does away with pin/UART configurations and makes them compile
   time. Also added CO₂ sensor options. This caused a revision of the
   configuration options, and you will need to reconfigure the sensor after

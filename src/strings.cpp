@@ -62,7 +62,7 @@ const char *serverIndex = R"(
     Visit the <a href="/reset">reset page</a>.
     <footer>
       <hr>
-      anton: revision %s
+      anton: revision %s (%s)
     </footer>
   </body>
 </html>

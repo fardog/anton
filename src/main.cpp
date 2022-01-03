@@ -69,6 +69,12 @@ ESP8266HTTPUpdateServer httpUpdater;
 HTTPUpdateServer httpUpdater;
 #endif
 
+#ifdef ESP8266
+#define ANTON_PLATFORM "ESP8266"
+#elif defined(ESP32)
+#define ANTON_PLATFORM "ESP32"
+#endif
+
 IotWebConf iotWebConf(PRODUCT_NAME, &dnsServer, &server, DEFAULT_PASSWORD, CONFIG_VERSION);
 
 iotwebconf::ParameterGroup sensorGroup = iotwebconf::ParameterGroup("sensorGroup", "Reporting");
@@ -228,7 +234,8 @@ void renderIndexPage(char *buf, Anton *anton)
       millis() / 1000,
       sensorName.value(),
       influxdbURL,
-      GIT_REV);
+      GIT_REV,
+      ANTON_PLATFORM);
 }
 
 void handleRoot()

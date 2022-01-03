@@ -170,7 +170,7 @@ Reporter *reporter = nullptr;
 EnvironmentSensor *environmentSensor = nullptr;
 Stream *co2SensorSerial = nullptr;
 CO2Sensor *co2Sensor = nullptr;
-SensorController *anton = nullptr;
+SensorController *sensorController = nullptr;
 
 void resetAll()
 {
@@ -191,12 +191,12 @@ void hardReset()
   ESP.restart();
 }
 
-void renderIndexPage(char *buf, SensorController *anton)
+void renderIndexPage(char *buf, SensorController *controller)
 {
-  AirData ad = anton->airData();
-  EnvironmentData ed = anton->environmentData();
-  CalculatedAQI aqi = anton->aqi();
-  CO2Data co2 = anton->co2Data();
+  AirData ad = controller->airData();
+  EnvironmentData ed = controller->environmentData();
+  CalculatedAQI aqi = controller->aqi();
+  CO2Data co2 = controller->co2Data();
 
   int lastMeasured = -1;
   if (ad.timestamp > 0)
@@ -205,12 +205,12 @@ void renderIndexPage(char *buf, SensorController *anton)
   }
 
   int reported = -1;
-  if (anton->lastReported() > 0)
+  if (controller->lastReported() > 0)
   {
-    reported = (millis() - anton->lastReported()) / 1000;
+    reported = (millis() - controller->lastReported()) / 1000;
   }
 
-  String lastStatus = anton->lastErrorMessage();
+  String lastStatus = controller->lastErrorMessage();
   if (lastStatus.equals(""))
   {
     lastStatus = "SUCCESS";
@@ -247,10 +247,10 @@ void handleRoot()
     return;
   }
 
-  if (anton)
+  if (sensorController)
   {
     char buf[2048];
-    renderIndexPage(buf, anton);
+    renderIndexPage(buf, sensorController);
     server.send(200, "text/html", buf);
   }
   else
@@ -411,7 +411,7 @@ void setup()
     co2Sensor = new MHZ19B_CO2Sensor(co2SensorSerial);
   }
 
-  anton = new SensorController(reporter, airSensor, co2Sensor, environmentSensor);
+  sensorController = new SensorController(reporter, airSensor, co2Sensor, environmentSensor);
 }
 
 void wifiConnected()
@@ -422,5 +422,5 @@ void wifiConnected()
 void loop()
 {
   iotWebConf.doLoop();
-  anton->loop();
+  sensorController->loop();
 }

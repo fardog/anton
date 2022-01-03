@@ -17,6 +17,7 @@ struct EnvironmentData
   uint8_t co2Accuracy;
   float breathVoc;
   uint8_t breathVocAccuracy;
+  unsigned int timestamp;
 };
 
 class EnvironmentSensor : public Looper

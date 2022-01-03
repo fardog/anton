@@ -1,10 +1,11 @@
 #include "BME680_EnvironmentSensor.h"
 
-BME680_EnvironmentSensor::BME680_EnvironmentSensor(TwoWire &i2c)
+BME680_EnvironmentSensor::BME680_EnvironmentSensor(TwoWire &i2c, float temperatureOffsetCelsius)
     : _sensor(Bsec())
 {
   _sensor.begin(BME680_I2C_ADDR_SECONDARY, i2c);
   _sensor.updateSubscription(_sensorList, 11, BSEC_SAMPLE_RATE_LP);
+  _sensor.setTemperatureOffset(temperatureOffsetCelsius);
 }
 
 bool BME680_EnvironmentSensor::getEnvironmentData(EnvironmentData *data)
@@ -27,7 +28,9 @@ void BME680_EnvironmentSensor::loop()
   {
     _ready = true;
     _data.tempC = _sensor.temperature;
+    _data.tempCRaw = _sensor.rawTemperature;
     _data.humPct = _sensor.humidity;
+    _data.humPctRaw = _sensor.rawHumidity;
     _data.pressure = _sensor.pressure;
     _data.gasResistance = _sensor.gasResistance;
     _data.iaq = _sensor.staticIaq;

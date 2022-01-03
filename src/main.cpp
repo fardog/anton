@@ -36,6 +36,10 @@
 #define PRODUCT_NAME "anton"
 #define DEFAULT_PASSWORD "anton-system"
 
+#ifndef BSEC_TEMPERATURE_OFFSET_C
+#define BSEC_TEMPERATURE_OFFSET_C 4.0
+#endif
+
 // pins
 #ifdef ESP8266
 #define PARTICULATE_RX D3
@@ -386,7 +390,7 @@ void setup()
   {
     Serial.println("setup: starting BME680 VOC sensor on I2C (default pins)");
     Wire.begin();
-    BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(Wire);
+    BME680_EnvironmentSensor *BME = new BME680_EnvironmentSensor(Wire, BSEC_TEMPERATURE_OFFSET_C);
     environmentSensor = BME;
   }
 

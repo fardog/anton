@@ -8,7 +8,7 @@
 class BME680_EnvironmentSensor : public EnvironmentSensor
 {
 public:
-  BME680_EnvironmentSensor(TwoWire &i2c);
+  BME680_EnvironmentSensor(TwoWire &i2c, float temperatureOffsetCelsius = 0.0);
   bool getEnvironmentData(EnvironmentData *data);
   void loop();
   String getLastError() { return _lastError; };

@@ -9,12 +9,6 @@ sensor parts. It's not pretty or full featured but it works.
 [InfluxDB]: https://docs.influxdata.com/influxdb/v1.8/
 [Luftdaten]: https://sensor.community/
 
-**Note:** the current `main` branch will not be optimal if you are using the
-ZH03B particulate sensor. If you are, it's recommended you use the [tagged
-v1.0.0 release][v1.0.0].
-
-[v1.0.0]: https://github.com/fardog/anton/releases/tag/v1.0.0
-
 ## Requirements
 
 Hardware:
@@ -135,7 +129,8 @@ error, it will be omitted from the InfluxDB submission.
 If you have the optional multisensor connected, the following additional fields
 fields will be sent; all are integers unless noted:
 
-* `temperature` °C
+* `temperature_c` (float) °C
+* `temperature_c_raw` (float) °C, uncompensated
 * `humidity` %rh
 * `pressure` hPa
 * `gas_resistance` Ohm
@@ -179,35 +174,7 @@ sensor.
 
 ## Changelog
 
-Changes which are not backwards compatible will be listed here. Anton is under
-active development and does not have a fixed feature set, nor does it have
-version numbers yet. For now, changes will be listed by date.
-
-* **2021-12-12** Move to Bosch Sensortec's [BSEC][bsec] library for the BME680,
-  which improves accuracy of the temperature/humidity readings as well as
-  provides equivalent CO₂ values without the dedicated sensor. However this
-  brings additional license restrictions which you should [view and
-  accept][bosch] before using.
-
-* **2021-09-25** Does away with pin/UART configurations and makes them compile
-  time. Also added CO₂ sensor options. This caused a revision of the
-  configuration options, and you will need to reconfigure the sensor after
-  flashing.
-
-* **2021-07-04** Moves from [WifiManager][] to [IotWebConf][]. *This is a
-  backwards incompatible change.* You will need to reconfigure the sensor after
-  upgrading.
-
-* **2020-10-22** Moved from the deprecated `SPIFFS` to the still-maintained
-  `LittleFS`. *This is a backwards incompatible change.* You will need to
-  reconfigure the sensor after upgrading.
-
-* **2020-10-03** earlier versions of Anton submitted values to InfluxDB as
-  floats; this has been corrected to use integer values. Updating will require
-  you to either use a new database or rewrite your existing one.
-
-[WifiManager]: https://github.com/tzapu/WiFiManager
-[IotWebConf]: https://github.com/prampec/IotWebConf
+See [CHANGELOG](./CHANGELOG.md).
 
 ## Acknowledgements
 

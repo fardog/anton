@@ -4,7 +4,9 @@
 struct EnvironmentData
 {
   float tempC;
+  float tempCRaw;
   float humPct;
+  float humPctRaw;
   float pressure;
   float gasResistance;
   float iaq;

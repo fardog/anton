@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 
+#include "interfaces/Looper.h"
 #include "reporters/Reporter.h"
 #include "sensors/AirSensor.h"
 #include "sensors/CO2Sensor.h"
@@ -30,15 +31,15 @@ struct State
   StateId next;
 };
 
-class Anton
+class SensorController : public Looper
 {
 public:
-  Anton(Reporter *reporter,
-        AirSensor *airSensor,
-        CO2Sensor *co2Sensor,
-        EnvironmentSensor *environmenSensor,
-        uint16_t timeBetweenMeasurements = 60000);
-  ~Anton();
+  SensorController(Reporter *reporter,
+                   AirSensor *airSensor,
+                   CO2Sensor *co2Sensor,
+                   EnvironmentSensor *environmenSensor,
+                   uint16_t timeBetweenMeasurements = 60000);
+  ~SensorController();
 
   void loop();
   AirData airData() { return _airData; }

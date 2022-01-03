@@ -1,11 +1,11 @@
 #include <Arduino.h>
-#include "Anton.h"
+#include "SensorController.h"
 
-Anton::Anton(Reporter *reporter,
-             AirSensor *airSensor,
-             CO2Sensor *co2Sensor,
-             EnvironmentSensor *environmentSensor,
-             uint16_t timeBetweenMeasurements)
+SensorController::SensorController(Reporter *reporter,
+                                   AirSensor *airSensor,
+                                   CO2Sensor *co2Sensor,
+                                   EnvironmentSensor *environmentSensor,
+                                   uint16_t timeBetweenMeasurements)
     : _reporter(reporter),
       _airSensor(airSensor),
       _co2Sensor(co2Sensor),
@@ -25,9 +25,9 @@ Anton::Anton(Reporter *reporter,
   _state = _states[0];
 }
 
-Anton::~Anton() {}
+SensorController::~SensorController() {}
 
-void Anton::loop()
+void SensorController::loop()
 {
   unsigned long now = millis();
 
@@ -81,7 +81,7 @@ void Anton::loop()
   }
 }
 
-void Anton::_nextState()
+void SensorController::_nextState()
 {
   Serial.printf("state change: %d -> %d, delaying %dms\n", _state.state, _state.next, _state.delay);
   _stateStart = millis() + _state.delay;
@@ -90,18 +90,18 @@ void Anton::_nextState()
   _stateFailed[_state.state] = false;
 }
 
-void Anton::_retry(uint16_t delay)
+void SensorController::_retry(uint16_t delay)
 {
   Serial.printf("retrying state %d, delaying %dms\n", _state.state, delay);
   _stateStart = millis() + delay;
 }
 
-void Anton::_startup()
+void SensorController::_startup()
 {
   _nextState();
 }
 
-void Anton::_wakeSensors()
+void SensorController::_wakeSensors()
 {
   if (!_airSensor)
   {
@@ -119,13 +119,13 @@ void Anton::_wakeSensors()
   }
 }
 
-void Anton::_warmUp()
+void SensorController::_warmUp()
 {
   Serial.println("warming up");
   _nextState();
 }
 
-void Anton::_sampleParticulate()
+void SensorController::_sampleParticulate()
 {
   if (_airSensor)
   {
@@ -145,7 +145,7 @@ void Anton::_sampleParticulate()
   }
 }
 
-void Anton::_sampleCO2()
+void SensorController::_sampleCO2()
 {
   if (_co2Sensor)
   {
@@ -160,7 +160,7 @@ void Anton::_sampleCO2()
   }
 }
 
-void Anton::_sampleEnvironment()
+void SensorController::_sampleEnvironment()
 {
   if (_environmentSensor)
   {
@@ -188,7 +188,7 @@ void Anton::_sampleEnvironment()
   }
 }
 
-void Anton::_sleepSensors()
+void SensorController::_sleepSensors()
 {
   if (!_airSensor)
   {
@@ -202,7 +202,7 @@ void Anton::_sleepSensors()
   }
 }
 
-void Anton::_report()
+void SensorController::_report()
 {
   AirData *ad = nullptr;
   EnvironmentData *ed = nullptr;
@@ -243,7 +243,7 @@ void Anton::_report()
   _retry(3000);
 }
 
-void Anton::_sleep()
+void SensorController::_sleep()
 {
   Serial.println("sleeping");
   _nextState();

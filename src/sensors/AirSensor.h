@@ -3,6 +3,8 @@
 
 #include <AQI.h>
 
+#include "interfaces/Looper.h"
+
 struct AirData
 {
   uint16_t p1_0;
@@ -19,11 +21,10 @@ struct CalculatedAQI
 
 bool calculateAQI(AirData sample, CalculatedAQI *aqi);
 
-class AirSensor
+class AirSensor : public Looper
 {
 public:
   virtual bool getAirData(AirData *data) = 0;
-  virtual void loop() = 0;
   virtual bool sleep() = 0;
   virtual bool wake() = 0;
 };

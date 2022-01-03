@@ -14,7 +14,7 @@
 
 #include "strings.h"
 
-#include "Anton.h"
+#include "SensorController.h"
 #include "reporters/Reporter.h"
 #include "reporters/InfluxDB_Reporter.h"
 #include "sensors/AirSensor.h"
@@ -170,7 +170,7 @@ Reporter *reporter = nullptr;
 EnvironmentSensor *environmentSensor = nullptr;
 Stream *co2SensorSerial = nullptr;
 CO2Sensor *co2Sensor = nullptr;
-Anton *anton = nullptr;
+SensorController *anton = nullptr;
 
 void resetAll()
 {
@@ -191,7 +191,7 @@ void hardReset()
   ESP.restart();
 }
 
-void renderIndexPage(char *buf, Anton *anton)
+void renderIndexPage(char *buf, SensorController *anton)
 {
   AirData ad = anton->airData();
   EnvironmentData ed = anton->environmentData();
@@ -411,7 +411,7 @@ void setup()
     co2Sensor = new MHZ19B_CO2Sensor(co2SensorSerial);
   }
 
-  anton = new Anton(reporter, airSensor, co2Sensor, environmentSensor);
+  anton = new SensorController(reporter, airSensor, co2Sensor, environmentSensor);
 }
 
 void wifiConnected()

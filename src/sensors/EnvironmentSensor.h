@@ -1,6 +1,8 @@
 #ifndef EnvironmentSensor_h
 #define EnvironmentSensor_h
 
+#include "interfaces/Looper.h"
+
 struct EnvironmentData
 {
   float tempC;
@@ -17,11 +19,10 @@ struct EnvironmentData
   uint8_t breathVocAccuracy;
 };
 
-class EnvironmentSensor
+class EnvironmentSensor : public Looper
 {
 public:
   virtual bool getEnvironmentData(EnvironmentData *data) = 0;
-  virtual void loop() = 0;
   virtual String getLastError() = 0;
 };
 

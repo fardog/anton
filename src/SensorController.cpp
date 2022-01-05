@@ -81,6 +81,23 @@ void SensorController::loop()
   }
 }
 
+int SensorController::calibrate()
+{
+  if (_co2Sensor)
+  {
+    if (_co2Sensor->calibrate())
+    {
+      return 0;
+    }
+    else
+    {
+      return -1;
+    }
+  }
+
+  return -1;
+}
+
 void SensorController::_nextState()
 {
   Serial.printf("state change: %d -> %d, delaying %dms\n", _state.state, _state.next, _state.delay);

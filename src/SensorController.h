@@ -42,6 +42,7 @@ public:
   ~SensorController();
 
   void loop();
+  int calibrate();
   AirData airData() { return _airData; }
   CO2Data co2Data() { return _co2Data; }
   EnvironmentData environmentData() { return _environmentData; }

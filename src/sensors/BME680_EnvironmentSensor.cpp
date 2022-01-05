@@ -39,6 +39,7 @@ void BME680_EnvironmentSensor::loop()
     _data.co2Accuracy = _sensor.co2Accuracy;
     _data.breathVoc = _sensor.breathVocEquivalent;
     _data.breathVocAccuracy = _sensor.breathVocAccuracy;
+    _data.timestamp = millis();
   }
   else
   {
